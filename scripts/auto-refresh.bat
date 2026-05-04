@@ -14,7 +14,8 @@ set LOG_FILE=%LOG_DIR%\auto-refresh.log
 echo. >> "%LOG_FILE%"
 echo === %DATE% %TIME% === >> "%LOG_FILE%"
 
-python RouteToDelivery.py >> "%LOG_FILE%" 2>&1
+REM -u = unbuffered stdout/stderr so the log file shows progress live
+python -u RouteToDelivery.py >> "%LOG_FILE%" 2>&1
 if errorlevel 1 (
     echo RouteToDelivery.py FAILED >> "%LOG_FILE%"
     exit /b 1
