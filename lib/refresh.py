@@ -2,6 +2,7 @@
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -10,6 +11,11 @@ import streamlit as st
 # Public Streamlit Cloud deployment — anyone with this URL can view the
 # dashboard from any browser (read-only view, no VPN required).
 PUBLIC_URL = "https://route-delivery-dashboard.streamlit.app"
+
+# Business timezone — used to display all timestamps consistently regardless
+# of where the server runs (Cloud is UTC, local Windows is Central). Chosen
+# as the Falcon Farms operations timezone.
+BUSINESS_TZ = "America/Chicago"
 
 # Data files that count as "the data" — newest mtime across these is shown
 # as the last-refresh timestamp.
@@ -21,12 +27,43 @@ _DATA_PATHS = [
 ]
 
 
-def _last_data_refresh():
-    """Newest mtime across the parquet data files, as a pd.Timestamp (or None)."""
+def _last_data_refresh_epoch():
+    """Newest mtime across data files as epoch seconds (timezone-independent)."""
     mtimes = [p.stat().st_mtime for p in _DATA_PATHS if p.exists()]
-    if not mtimes:
+    return max(mtimes) if mtimes else None
+
+
+def _last_data_refresh():
+    """Newest mtime across the parquet data files, as a naive pd.Timestamp
+    in BUSINESS_TZ (so it shows the same hour on local and on Cloud).
+    """
+    epoch = _last_data_refresh_epoch()
+    if epoch is None:
         return None
-    return pd.Timestamp.fromtimestamp(max(mtimes))
+    return (pd.Timestamp(epoch, unit='s', tz='UTC')
+              .tz_convert(BUSINESS_TZ)
+              .tz_localize(None))
+
+
+def _format_ago(epoch: float) -> str:
+    """Returns 'just now' / 'N min ago' / 'N h ago' / 'N d ago' from epoch seconds."""
+    mins = int((time.time() - epoch) // 60)
+    if mins < 1:
+        return "just now"
+    if mins < 60:
+        return f"{mins} min ago"
+    if mins < 60 * 24:
+        return f"{mins // 60} h ago"
+    return f"{mins // (60 * 24)} d ago"
+
+
+def _to_business_tz(ts):
+    """Convert a naive UTC timestamp into a naive timestamp in BUSINESS_TZ.
+    Returns the input unchanged if it's None/NaT.
+    """
+    if ts is None or pd.isna(ts):
+        return ts
+    return ts.tz_localize('UTC').tz_convert(BUSINESS_TZ).tz_localize(None)
 
 
 def is_cloud() -> bool:
@@ -112,19 +149,14 @@ def render_refresh_section(last_visit):
     Hidden on cloud (read-only banner only).
     """
     st.header("📡 Data")
-    last_refresh = _last_data_refresh()
-    if last_refresh is not None:
-        delta = pd.Timestamp.now() - last_refresh
-        mins = int(delta.total_seconds() // 60)
-        if mins < 60:
-            ago = f"{mins} min ago"
-        elif mins < 60 * 24:
-            ago = f"{mins // 60} h ago"
-        else:
-            ago = f"{mins // (60 * 24)} d ago"
+    epoch = _last_data_refresh_epoch()
+    if epoch is not None:
+        last_refresh = _last_data_refresh()
+        ago = _format_ago(epoch)
         st.caption(f"Last refresh: **{last_refresh.strftime('%Y-%m-%d %H:%M')}** · _{ago}_")
     if pd.notna(last_visit):
-        st.caption(f"Last visit in data: **{last_visit.strftime('%Y-%m-%d %H:%M')}**")
+        last_visit_biz = _to_business_tz(last_visit)
+        st.caption(f"Last visit in data: **{last_visit_biz.strftime('%Y-%m-%d %H:%M')}**")
     else:
         st.caption("No visits recorded yet")
 
