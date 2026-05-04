@@ -39,8 +39,8 @@ if f['cluster_filter'] != '(All)':
     expected_stores = expected_stores[
         expected_stores['CLUSTER FULL'].astype(str).str.strip().str.upper() == f['cluster_filter']
     ]
-if f['customer_filter']:
-    expected_stores = expected_stores[expected_stores['CUSTOMER'].isin(f['customer_filter'])]
+if f['customer_filter'] != '(All)':
+    expected_stores = expected_stores[expected_stores['CUSTOMER'] == f['customer_filter']]
 total_expected = expected_stores['Store_Number'].nunique()
 
 in_progress_count = 0

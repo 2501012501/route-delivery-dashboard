@@ -97,12 +97,33 @@ _CSS = f"""
     display: inline-block;
     padding: 3px 9px;
     border-radius: 12px;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
   }}
   .rtd-pill.ok    {{ background: {PALE_BLUE}; color: {BLUE}; }}
   .rtd-pill.warn  {{ background: {AMBER_BG}; color: {AMBER_FG}; }}
   .rtd-pill.pend  {{ background: {GRAY_BG}; color: {SLATE}; }}
+
+  /* ── Sidebar headers uniform (UPPERCASE small caps style) ── */
+  section[data-testid="stSidebar"] h2,
+  section[data-testid="stSidebar"] h3 {{
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: {NAVY};
+    margin-top: 8px;
+  }}
+  /* Sidebar widget labels (Date, Cluster, Customer, ...) uppercase too */
+  section[data-testid="stSidebar"] label p {{
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-size: 10px;
+    font-weight: 600;
+    color: {SLATE};
+  }}
 </style>
 """
 

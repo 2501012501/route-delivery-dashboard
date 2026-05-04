@@ -108,14 +108,14 @@ for d in pd.date_range(week_start, target_date, freq='D'):
         routes_d = routes_d[
             routes_d[route_cols['cluster']].astype(str).str.strip().str.upper() == f['cluster_filter']
         ]
-    if f['route_filter']:
-        routes_d = routes_d[routes_d[route_cols['route_afs']].isin(f['route_filter'])]
+    if f['route_filter'] != '(All)':
+        routes_d = routes_d[routes_d[route_cols['route_afs']] == f['route_filter']]
     rids_d = routes_d[route_cols['route_afs']].dropna().unique()
     stores_d = sm[sm['Route_ID_AFS'].isin(rids_d)]
-    if f['customer_filter']:
-        stores_d = stores_d[stores_d['CUSTOMER'].isin(f['customer_filter'])]
-    if f['store_filter']:
-        stores_d = stores_d[stores_d['Store_Number'].isin(f['store_filter'])]
+    if f['customer_filter'] != '(All)':
+        stores_d = stores_d[stores_d['CUSTOMER'] == f['customer_filter']]
+    if f['store_filter'] != '(All)':
+        stores_d = stores_d[stores_d['Store_Number'] == f['store_filter']]
     planned = stores_d['Store_Number'].nunique()
     visited = vis_w[vis_w['Visit_Date'] == d_date]['Store_Number'].nunique()
     sent_units = float(sent_w[sent_w['DATE'] == d_date]['DELIVERY UNITS'].sum()) if sent_w is not None else 0.0

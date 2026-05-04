@@ -35,26 +35,27 @@ def render_sidebar_filters(*, sm, vis, inv, dlv, rm, route_cols) -> dict:
     cluster_filter = st.selectbox("Cluster", cluster_options)
 
     customer_options = sorted(sm['CUSTOMER'].dropna().unique().tolist())
-    customer_filter = st.multiselect("Customer", customer_options, default=customer_options)
+    customer_filter = st.selectbox("Customer", ['(All)'] + customer_options)
 
     sm_filtered = sm.copy()
     if cluster_filter != '(All)':
         sm_filtered = sm_filtered[
             sm_filtered['CLUSTER FULL'].astype(str).str.strip().str.upper() == cluster_filter
         ]
-    if customer_filter:
-        sm_filtered = sm_filtered[sm_filtered['CUSTOMER'].isin(customer_filter)]
+    if customer_filter != '(All)':
+        sm_filtered = sm_filtered[sm_filtered['CUSTOMER'] == customer_filter]
     route_options = sorted(sm_filtered['Route_ID_AFS'].dropna().unique().tolist())
-    route_filter = st.multiselect(
-        "Route (Route_ID_AFS)", route_options,
-        help="Empty = all routes matching the other filters",
+    route_filter = st.selectbox(
+        "Route (Route_ID_AFS)", ['(All)'] + route_options,
+        help="(All) = every route matching the other filters",
     )
 
-    if route_filter:
-        sm_filtered = sm_filtered[sm_filtered['Route_ID_AFS'].isin(route_filter)]
+    if route_filter != '(All)':
+        sm_filtered = sm_filtered[sm_filtered['Route_ID_AFS'] == route_filter]
     store_options = sorted(sm_filtered['Store_Number'].dropna().unique().tolist())
-    store_filter = st.multiselect(
-        "Store (Store_Number)", store_options, help="Empty = all stores",
+    store_filter = st.selectbox(
+        "Store (Store_Number)", ['(All)'] + store_options,
+        help="(All) = every store matching the other filters",
     )
 
     KNOWN_ACTIVITIES = ['Driver Merchandiser Visit', 'Supervisor Visit']
@@ -62,8 +63,8 @@ def render_sidebar_filters(*, sm, vis, inv, dlv, rm, route_cols) -> dict:
         at_options = sorted(set(vis['Activity_Type'].dropna().unique().tolist()) | set(KNOWN_ACTIVITIES))
     else:
         at_options = KNOWN_ACTIVITIES
-    activity_filter = st.multiselect(
-        "Activity Type", at_options, default=at_options,
+    activity_filter = st.selectbox(
+        "Activity Type", ['(All)'] + at_options,
         help="If filtering shows no change, refresh the API (🔁) — the field isn't in the loaded data yet.",
     )
 
@@ -87,17 +88,20 @@ def render_sidebar_filters(*, sm, vis, inv, dlv, rm, route_cols) -> dict:
 
 
 def apply_filters(df: pd.DataFrame, f: dict, *, also_activity: bool = False) -> pd.DataFrame:
-    """Apply the selections from render_sidebar_filters(...) to a fact dataframe."""
+    """Apply the selections from render_sidebar_filters(...) to a fact dataframe.
+
+    Each filter is a single string; '(All)' means no filtering on that column.
+    """
     if f['cluster_filter'] != '(All)' and 'CLUSTER FULL' in df.columns:
         df = df[df['CLUSTER FULL'].astype(str).str.strip().str.upper() == f['cluster_filter']]
-    if f['customer_filter'] and 'CUSTOMER' in df.columns:
-        df = df[df['CUSTOMER'].isin(f['customer_filter'])]
-    if f['route_filter'] and 'Route_ID_AFS' in df.columns:
-        df = df[df['Route_ID_AFS'].isin(f['route_filter'])]
-    if f['store_filter'] and 'Store_Number' in df.columns:
-        df = df[df['Store_Number'].isin(f['store_filter'])]
-    if also_activity and f['activity_filter'] and 'Activity_Type' in df.columns:
-        df = df[df['Activity_Type'].isin(f['activity_filter'])]
+    if f['customer_filter'] != '(All)' and 'CUSTOMER' in df.columns:
+        df = df[df['CUSTOMER'] == f['customer_filter']]
+    if f['route_filter'] != '(All)' and 'Route_ID_AFS' in df.columns:
+        df = df[df['Route_ID_AFS'] == f['route_filter']]
+    if f['store_filter'] != '(All)' and 'Store_Number' in df.columns:
+        df = df[df['Store_Number'] == f['store_filter']]
+    if also_activity and f['activity_filter'] != '(All)' and 'Activity_Type' in df.columns:
+        df = df[df['Activity_Type'] == f['activity_filter']]
     return df
 
 
@@ -142,6 +146,6 @@ def routes_for_day(rm: pd.DataFrame, *, target_date, cluster_filter, route_filte
         routes_today = routes_today[
             routes_today[route_cols['cluster']].astype(str).str.strip().str.upper() == cluster_filter
         ]
-    if route_filter:
-        routes_today = routes_today[routes_today[route_cols['route_afs']].isin(route_filter)]
+    if route_filter != '(All)':
+        routes_today = routes_today[routes_today[route_cols['route_afs']] == route_filter]
     return routes_today

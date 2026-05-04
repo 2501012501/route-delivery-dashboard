@@ -79,12 +79,12 @@ err = err.merge(rm_route_no, on='Route_ID_AFS', how='left')
 
 if f['cluster_filter'] != '(All)':
     err = err[err['CLUSTER FULL'].astype(str).str.strip().str.upper() == f['cluster_filter']]
-if f['customer_filter']:
-    err = err[err['CUSTOMER'].isin(f['customer_filter'])]
-if f['route_filter']:
-    err = err[err['Route_ID_AFS'].isin(f['route_filter'])]
-if f['store_filter']:
-    err = err[err['Store_Number'].isin(f['store_filter'])]
+if f['customer_filter'] != '(All)':
+    err = err[err['CUSTOMER'] == f['customer_filter']]
+if f['route_filter'] != '(All)':
+    err = err[err['Route_ID_AFS'] == f['route_filter']]
+if f['store_filter'] != '(All)':
+    err = err[err['Store_Number'] == f['store_filter']]
 
 err = err[err['Difference'].abs() >= 1]
 

@@ -9,7 +9,24 @@ import streamlit as st
 
 # Public Streamlit Cloud deployment — anyone with this URL can view the
 # dashboard from any browser (read-only view, no VPN required).
-PUBLIC_URL = "https://route-delivery-dashboard-2bkfhlh7k2cbycdkrmisnu.streamlit.app"
+PUBLIC_URL = "https://route-delivery-dashboard.streamlit.app"
+
+# Data files that count as "the data" — newest mtime across these is shown
+# as the last-refresh timestamp.
+_DATA_PATHS = [
+    Path("Route To Delivery Data") / "inventory.parquet",
+    Path("Route To Delivery Data") / "delivery.parquet",
+    Path("Route To Delivery Data") / "visits.parquet",
+    Path("data") / "deliveries.parquet",
+]
+
+
+def _last_data_refresh():
+    """Newest mtime across the parquet data files, as a pd.Timestamp (or None)."""
+    mtimes = [p.stat().st_mtime for p in _DATA_PATHS if p.exists()]
+    if not mtimes:
+        return None
+    return pd.Timestamp.fromtimestamp(max(mtimes))
 
 
 def is_cloud() -> bool:
@@ -95,8 +112,19 @@ def render_refresh_section(last_visit):
     Hidden on cloud (read-only banner only).
     """
     st.header("📡 Data")
+    last_refresh = _last_data_refresh()
+    if last_refresh is not None:
+        delta = pd.Timestamp.now() - last_refresh
+        mins = int(delta.total_seconds() // 60)
+        if mins < 60:
+            ago = f"{mins} min ago"
+        elif mins < 60 * 24:
+            ago = f"{mins // 60} h ago"
+        else:
+            ago = f"{mins // (60 * 24)} d ago"
+        st.caption(f"Last refresh: **{last_refresh.strftime('%Y-%m-%d %H:%M')}** · _{ago}_")
     if pd.notna(last_visit):
-        st.caption(f"Last visit recorded: **{last_visit.strftime('%Y-%m-%d %H:%M')}**")
+        st.caption(f"Last visit in data: **{last_visit.strftime('%Y-%m-%d %H:%M')}**")
     else:
         st.caption("No visits recorded yet")
 

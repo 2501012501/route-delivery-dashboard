@@ -10,15 +10,19 @@ def latest_per(df: pd.DataFrame, key_cols: list, time_col: str) -> pd.DataFrame:
 
 
 def store_day_summary(*, target_route_ids, sm, vis_d, dlv_latest, inv_latest,
-                      cluster_filter: str, customer_filter, store_filter) -> pd.DataFrame:
-    """Per-store summary for the selected routes on the day."""
+                      cluster_filter: str, customer_filter: str,
+                      store_filter: str) -> pd.DataFrame:
+    """Per-store summary for the selected routes on the day.
+
+    customer_filter / store_filter are single strings; '(All)' = no filter.
+    """
     stores = sm[sm['Route_ID_AFS'].isin(target_route_ids)].copy()
     if cluster_filter != '(All)':
         stores = stores[stores['CLUSTER FULL'].astype(str).str.strip().str.upper() == cluster_filter]
-    if customer_filter:
-        stores = stores[stores['CUSTOMER'].isin(customer_filter)]
-    if store_filter:
-        stores = stores[stores['Store_Number'].isin(store_filter)]
+    if customer_filter != '(All)':
+        stores = stores[stores['CUSTOMER'] == customer_filter]
+    if store_filter != '(All)':
+        stores = stores[stores['Store_Number'] == store_filter]
 
     dur_col = 'Actual_duration' if 'Actual_duration' in vis_d.columns else 'CostCenter_Duration'
 
@@ -75,8 +79,11 @@ def store_status(row) -> str:
 
 
 def cluster_compliance_data(*, routes_today, sm, vis_d, route_cols,
-                             customer_filter, store_filter) -> pd.DataFrame:
-    """Per-cluster compliance for routes_today. Columns: Cluster, Visited, Planned, Pct."""
+                             customer_filter: str, store_filter: str) -> pd.DataFrame:
+    """Per-cluster compliance for routes_today. Columns: Cluster, Visited, Planned, Pct.
+
+    customer_filter / store_filter are single strings; '(All)' = no filter.
+    """
     if routes_today.empty:
         return pd.DataFrame()
     rows = []
@@ -85,10 +92,10 @@ def cluster_compliance_data(*, routes_today, sm, vis_d, route_cols,
     for cluster_name, group in grouped:
         rids = group[route_cols['route_afs']].dropna().unique()
         stores = sm[sm['Route_ID_AFS'].isin(rids)]
-        if customer_filter:
-            stores = stores[stores['CUSTOMER'].isin(customer_filter)]
-        if store_filter:
-            stores = stores[stores['Store_Number'].isin(store_filter)]
+        if customer_filter != '(All)':
+            stores = stores[stores['CUSTOMER'] == customer_filter]
+        if store_filter != '(All)':
+            stores = stores[stores['Store_Number'] == store_filter]
         planned = stores['Store_Number'].nunique()
         visited = vis_d[vis_d['Store_Number'].isin(stores['Store_Number'])]['Store_Number'].nunique()
         pct = (visited / planned) if planned else 0
