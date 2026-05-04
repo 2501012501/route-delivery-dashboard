@@ -18,6 +18,19 @@ DATA_DIR = Path("Route To Delivery Data")
 # Detect if running on Streamlit Community Cloud (no VPN, no on-prem SQL access)
 IS_CLOUD = ('/mount/src/' in os.getcwd()) or bool(os.environ.get('STREAMLIT_RUNTIME'))
 
+# Cluster aliases — store master uses different names than route master for some clusters.
+# Apply as `value.upper().strip() → canonical name` so filters and breakdowns match.
+CLUSTER_ALIAS = {
+    'DFW': 'DALLAS',
+}
+
+
+def _normalize_cluster(value):
+    if pd.isna(value):
+        return value
+    s = str(value).strip().upper()
+    return CLUSTER_ALIAS.get(s, s)
+
 # ── Page setup ────────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Route Delivery Dashboard", layout="wide", page_icon="🚚")
 st.title("🚚 Route Delivery Dashboard")
@@ -32,12 +45,19 @@ def load_data():
     vis = pd.read_parquet(DATA_DIR / "visits.parquet")
     sm  = pd.read_parquet(DATA_DIR / "store_master.parquet")
 
+    # Normalize cluster names so filters work consistently (e.g. DFW = DALLAS)
+    for _df in (sm, inv, dlv, vis):
+        if 'CLUSTER FULL' in _df.columns:
+            _df['CLUSTER FULL'] = _df['CLUSTER FULL'].apply(_normalize_cluster)
+
     # "Sent" = data/deliveries.parquet (extract --deliveries + Transform.py)
     sent_path = Path("data") / "deliveries.parquet"
     sent = pd.read_parquet(sent_path) if sent_path.exists() else None
     if sent is not None:
         sent['DATE'] = pd.to_datetime(sent['DATE'], errors='coerce').dt.date
         sent['DELIVERY UNITS'] = pd.to_numeric(sent['DELIVERY UNITS'], errors='coerce').fillna(0)
+        if 'CLUSTER FULL' in sent.columns:
+            sent['CLUSTER FULL'] = sent['CLUSTER FULL'].apply(_normalize_cluster)
         # Keep only the last 14 days (enough to compare and stay lightweight)
         cutoff = (pd.Timestamp.now() - pd.Timedelta(days=14)).date()
         sent = sent[sent['DATE'] >= cutoff]
