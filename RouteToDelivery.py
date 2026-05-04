@@ -304,6 +304,13 @@ def main():
     vis.to_parquet(f"{OUT_DIR}/visits.parquet", index=False)
     vis.to_csv(f"{OUT_DIR}/visits.csv", index=False)
 
+    # Write a sync marker so the dashboard can show "Synced: <time>"
+    # separately from "Latest visit". This file travels with the parquets
+    # through git, so Cloud sees the same value as local.
+    sync_marker = pd.Timestamp.now(tz='UTC').tz_localize(None).isoformat() + "Z"
+    with open(f"{OUT_DIR}/last_synced.txt", "w", encoding="utf-8") as fh:
+        fh.write(sync_marker)
+
     elapsed = time.time() - started
     print(f"\nDone in {elapsed:.0f}s. Files saved to '{OUT_DIR}/'")
 

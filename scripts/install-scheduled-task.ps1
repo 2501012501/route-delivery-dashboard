@@ -65,10 +65,13 @@ Register-ScheduledTask -TaskName $TaskName `
                        -Principal $Principal `
                        -Description "Hourly auto-refresh of Route to Delivery dashboard data and push to GitHub for Streamlit Cloud."
 
+$LogDir = Join-Path $env:LOCALAPPDATA "RouteToDelivery\logs"
+
 Write-Host ""
 Write-Host "Task '$TaskName' installed." -ForegroundColor Green
 Write-Host "Schedule: every hour, 7:00 AM to 8:00 PM (Central)."
-Write-Host "Logs:     $ScriptDir\..\logs\auto-refresh.log"
+Write-Host "Logs:     $LogDir\auto-refresh.log"
+Write-Host "Wrapper:  $LogDir\vbs-debug.log"
 Write-Host ""
 Write-Host "To run it once now from PowerShell:"
 Write-Host "    Start-ScheduledTask -TaskName $TaskName"

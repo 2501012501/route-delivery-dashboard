@@ -26,6 +26,10 @@ _DATA_PATHS = [
     Path("data") / "deliveries.parquet",
 ]
 
+# Sync marker written by RouteToDelivery.py at end of run. Travels with the
+# parquets through git so Cloud sees the same value as local.
+SYNC_MARKER_PATH = Path("Route To Delivery Data") / "last_synced.txt"
+
 
 def _file_mtime_epoch():
     """Newest filesystem mtime across data files. On Cloud this reflects the
@@ -34,6 +38,25 @@ def _file_mtime_epoch():
     """
     mtimes = [p.stat().st_mtime for p in _DATA_PATHS if p.exists()]
     return max(mtimes) if mtimes else None
+
+
+def _last_synced_epoch() -> float | None:
+    """Read the sync marker written by RouteToDelivery.py at end of its run.
+    Returns epoch seconds, or None if the marker is missing/unreadable.
+    Same value on local and Cloud since the file is committed to git.
+    """
+    try:
+        if not SYNC_MARKER_PATH.exists():
+            return None
+        text = SYNC_MARKER_PATH.read_text(encoding="utf-8").strip()
+        if not text:
+            return None
+        # Strip the trailing 'Z' (UTC) and parse as naive UTC.
+        if text.endswith("Z"):
+            text = text[:-1]
+        return pd.Timestamp(text).tz_localize('UTC').timestamp()
+    except Exception:
+        return None
 
 
 def _data_freshness_epoch(*, vis=None) -> float | None:
@@ -225,8 +248,8 @@ def render_refresh_section(last_visit, *, vis=None):
     `vis` is the visits dataframe — used to compute the data-content freshness
     indicator that's consistent between local and Cloud.
     """
-    epoch_data = _data_freshness_epoch(vis=vis)
-    epoch_file = _file_mtime_epoch()
+    epoch_sync  = _last_synced_epoch()       # when we pulled from Retex API
+    epoch_data  = _data_freshness_epoch(vis=vis)  # latest visit recorded in data
 
     # If a recent publish errored, surface it OUTSIDE the expander so the
     # user notices without having to open the Data section.
@@ -234,8 +257,13 @@ def render_refresh_section(last_visit, *, vis=None):
     if pending and pending['kind'] == 'error':
         st.error(f"⚠️ Auto-publish failed:\n{pending['msg']}")
 
-    if epoch_data is not None:
-        label = f"📡 Data · Updated {_format_ago(epoch_data)}"
+    # The collapsed label shows the SYNC time (when we last pulled fresh data),
+    # because that's what tells the user the system is working. Latest visit
+    # time is a different (and often older) concept — shown inside the expander.
+    epoch_label = epoch_sync if epoch_sync is not None else epoch_data
+    if epoch_label is not None:
+        verb = "Synced" if epoch_sync is not None else "Updated"
+        label = f"📡 Data · {verb} {_format_ago(epoch_label)}"
     else:
         label = "📡 Data"
     if pending and pending['kind'] == 'error':
@@ -245,14 +273,20 @@ def render_refresh_section(last_visit, *, vis=None):
         # Show any non-error publish status (success / info) that survived the rerun
         render_publish_status()
 
-        # Single freshness line: when the newest record in the data was created
-        # (max Visit_DateTime). This is what 'how fresh is the data' really means
-        # and it's the same value on local and on Cloud.
+        # Two distinct timestamps the user cares about:
+        #   1) Synced — when RouteToDelivery.py last ran (proves the pipeline works)
+        #   2) Latest visit — newest visit recorded in the data (depends on Retex)
+        if epoch_sync is not None:
+            ts = (pd.Timestamp(epoch_sync, unit='s', tz='UTC')
+                    .tz_convert(BUSINESS_TZ)
+                    .tz_localize(None))
+            st.caption(f"☁️ **Synced:** {ts.strftime('%Y-%m-%d %H:%M')} · _{_format_ago(epoch_sync)}_")
+
         if epoch_data is not None:
             ts = (pd.Timestamp(epoch_data, unit='s', tz='UTC')
                     .tz_convert(BUSINESS_TZ)
                     .tz_localize(None))
-            st.caption(f"Data updated: **{ts.strftime('%Y-%m-%d %H:%M')}** · _{_format_ago(epoch_data)}_")
+            st.caption(f"📍 **Latest visit:** {ts.strftime('%Y-%m-%d %H:%M')} · _{_format_ago(epoch_data)}_")
 
         if is_cloud():
             st.caption("🌐 **Read-only view** — refresh disabled in cloud. "

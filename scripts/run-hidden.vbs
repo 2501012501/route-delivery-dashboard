@@ -2,21 +2,29 @@
 ' The scheduled task points wscript.exe -> this .vbs -> auto-refresh.bat
 ' which avoids the black cmd window popping up every hour.
 '
-' Self-logs to logs\vbs-debug.log so we can verify the wrapper itself ran
-' even if the .bat fails to start.
+' Self-logs to %LOCALAPPDATA%\RouteToDelivery\logs\vbs-debug.log so we can
+' verify the wrapper itself ran even if the .bat fails to start.
 
 Option Explicit
 
-Dim FSO, Shell, ScriptDir, BatPath, LogPath, LogFile, ExitCode
+Dim FSO, Shell, ScriptDir, BatPath, LogDir, LogPath, LogFile, ExitCode
 
 Set FSO = CreateObject("Scripting.FileSystemObject")
+Set Shell = CreateObject("WScript.Shell")
 ScriptDir = FSO.GetParentFolderName(WScript.ScriptFullName)
 BatPath = ScriptDir & "\auto-refresh.bat"
-LogPath = FSO.GetParentFolderName(ScriptDir) & "\logs\vbs-debug.log"
 
-' Make sure the logs folder exists
-If Not FSO.FolderExists(FSO.GetParentFolderName(LogPath)) Then
-    FSO.CreateFolder(FSO.GetParentFolderName(LogPath))
+' Logs live OUTSIDE OneDrive (which locks files mid-write).
+' %LOCALAPPDATA%\RouteToDelivery\logs is local-only, no sync interference.
+LogDir = Shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\RouteToDelivery\logs"
+LogPath = LogDir & "\vbs-debug.log"
+
+' Make sure the logs folder exists (create parent then child if needed)
+If Not FSO.FolderExists(Shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\RouteToDelivery") Then
+    FSO.CreateFolder(Shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\RouteToDelivery")
+End If
+If Not FSO.FolderExists(LogDir) Then
+    FSO.CreateFolder(LogDir)
 End If
 
 ' Open the debug log in append mode (8) and create if missing (True)
@@ -26,8 +34,7 @@ LogFile.WriteLine "ScriptFullName: " & WScript.ScriptFullName
 LogFile.WriteLine "ScriptDir:      " & ScriptDir
 LogFile.WriteLine "BatPath:        " & BatPath
 LogFile.WriteLine "BatPath exists: " & FSO.FileExists(BatPath)
-
-Set Shell = CreateObject("WScript.Shell")
+LogFile.WriteLine "LogDir:         " & LogDir
 
 On Error Resume Next
 ' Wrap the path in quotes (Chr(34) = "). Using cmd /c to be explicit about

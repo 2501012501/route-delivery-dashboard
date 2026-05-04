@@ -12,18 +12,22 @@ import streamlit as st
 from lib.data import load_data
 from lib.filters import render_sidebar_filters
 from lib.refresh import (_data_freshness_epoch, _format_ago,
-                          render_refresh_section)
+                          _last_synced_epoch, render_refresh_section)
 from lib.routes import annotate_service_days, detect_route_columns
 from lib.theme import inject_css, top_header
 
 
 def _format_freshness(vis=None) -> str | None:
-    """Returns 'Data updated N min ago' computed from the newest record
-    inside the loaded data — same value on local and Cloud."""
+    """Returns 'Synced N min ago' from the sync marker (preferred) or
+    'Updated N min ago' from the newest visit (fallback when marker absent).
+    Same value on local and Cloud — the marker file ships through git."""
+    epoch = _last_synced_epoch()
+    if epoch is not None:
+        return f"Synced {_format_ago(epoch)}"
     epoch = _data_freshness_epoch(vis=vis)
     if epoch is None:
         return None
-    return f"Data updated {_format_ago(epoch)}"
+    return f"Updated {_format_ago(epoch)}"
 
 
 def setup():

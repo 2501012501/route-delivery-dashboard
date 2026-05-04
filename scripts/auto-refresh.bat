@@ -7,7 +7,9 @@ REM Hand off to Windows Task Scheduler — see scripts\install-scheduled-task.ps
 setlocal
 cd /d "%~dp0\.."
 
-set LOG_DIR=%~dp0\..\logs
+REM Logs live OUTSIDE OneDrive — OneDrive sync was locking the file mid-append
+REM and silently dropping every >> redirect. %LOCALAPPDATA% is local-only.
+set LOG_DIR=%LOCALAPPDATA%\RouteToDelivery\logs
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
 set LOG_FILE=%LOG_DIR%\auto-refresh.log
 

@@ -25,8 +25,32 @@ def normalize_cluster(value):
     return CLUSTER_ALIAS.get(s, s)
 
 
-@st.cache_data(show_spinner="Loading data...")
+def _data_files_signature() -> tuple:
+    """Tuple of mtimes for the data files. Used as a cache key so the
+    cached load_data() invalidates as soon as any parquet on disk changes —
+    e.g. after a git pull on Cloud or a local API refresh.
+
+    Without this, @st.cache_data would memoize the first read forever
+    because the function takes no arguments.
+    """
+    paths = [
+        DATA_DIR / "inventory.parquet",
+        DATA_DIR / "delivery.parquet",
+        DATA_DIR / "visits.parquet",
+        DATA_DIR / "store_master.parquet",
+        DATA_DIR / "route_master.parquet",
+        SENT_PATH,
+    ]
+    return tuple(p.stat().st_mtime if p.exists() else 0.0 for p in paths)
+
+
 def load_data():
+    """Public entry — fresh whenever the underlying parquet files change."""
+    return _load_data_cached(_data_files_signature())
+
+
+@st.cache_data(show_spinner="Loading data...")
+def _load_data_cached(signature: tuple):
     """Returns (inv, dlv, vis, sm, rm, rm_error, sent).
 
     rm may be None if route_master.parquet is missing (rm_error explains why).
