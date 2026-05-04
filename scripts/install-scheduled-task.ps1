@@ -13,6 +13,7 @@ param(
 $TaskName = "RouteToDelivery-AutoRefresh"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $BatPath = Join-Path $ScriptDir "auto-refresh.bat"
+$VbsPath = Join-Path $ScriptDir "run-hidden.vbs"
 
 if ($Uninstall) {
     if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
@@ -28,9 +29,14 @@ if (-not (Test-Path $BatPath)) {
     Write-Error "Cannot find auto-refresh.bat at: $BatPath"
     return
 }
+if (-not (Test-Path $VbsPath)) {
+    Write-Error "Cannot find run-hidden.vbs at: $VbsPath"
+    return
+}
 
-# Action: run the .bat (which runs Python + git push)
-$Action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$BatPath`""
+# Action: run the .vbs wrapper via wscript so the cmd window stays hidden.
+# wscript.exe -> run-hidden.vbs -> auto-refresh.bat (Python + git push)
+$Action = New-ScheduledTaskAction -Execute "wscript.exe" -Argument "`"$VbsPath`""
 
 # Trigger: every day at 7am, repeating every hour for 13 hours (until 8pm)
 $Trigger = New-ScheduledTaskTrigger -Daily -At 7am
