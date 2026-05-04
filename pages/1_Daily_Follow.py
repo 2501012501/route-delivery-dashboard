@@ -10,6 +10,38 @@ from lib.theme import (NAVY, BLUE, PALE_BLUE, BORDER, SLATE,
                         kpi, kpi_grid, page_header,
                         panel_close, panel_open, pill)
 
+# Status -> emoji mapping for visual indicators in tables and filters.
+# Plain-text status is the source of truth (computed by store_status / below);
+# emojis are added at render time only.
+_STATUS_EMOJI = {
+    'Visited':     '🟢 Visited',
+    'In progress': '🟡 In progress',
+    'Pending':     '⚪ Pending',
+}
+
+
+def _route_status(compliance_pct: float, planned: int) -> str:
+    """Derive a route-level status from its compliance percentage.
+    Pending if no stores planned or no visits; Visited at 100%; In progress otherwise.
+    """
+    if planned == 0 or compliance_pct == 0:
+        return 'Pending'
+    if compliance_pct >= 100:
+        return 'Visited'
+    return 'In progress'
+
+
+def _status_filter(key: str) -> str:
+    """Render a horizontal radio for filtering by status.
+    Returns the selected plain status, or '(All)'.
+    """
+    choice = st.radio(
+        "Status",
+        ['(All)', '🟢 Visited', '🟡 In progress', '⚪ Pending'],
+        horizontal=True, key=key, label_visibility="collapsed",
+    )
+    return '(All)' if choice == '(All)' else choice.split(' ', 1)[1]
+
 st.set_page_config(page_title="Daily Follow", layout="wide", page_icon="📅")
 (inv, dlv, vis, sm, rm, sent), route_cols, f = setup()
 
@@ -122,11 +154,13 @@ else:
             )
             planned = len(s)
             visited = int((s['Visited'] > 0).sum())
+            compliance = (visited / planned * 100) if planned else 0
             rows.append({
+                'Status':       _route_status(compliance, planned),
                 'Route No.':    r[route_cols['route_no']] if route_cols['route_no'] else '',
                 'Route_ID_AFS': rid,
                 'Cluster':      r[route_cols['cluster']] if route_cols['cluster'] else '',
-                'Compliance':   (visited / planned * 100) if planned else 0,
+                'Compliance':   compliance,
                 'Visited':      visited,
                 'Planned':      planned,
                 'Bunches':      int(s['Bunches_Delivered'].sum()),
@@ -135,10 +169,16 @@ else:
             })
         df_routes = pd.DataFrame(rows).sort_values('Compliance', ascending=False)
         panel_open("Routes")
+        sel_status = _status_filter("rs_status_filter")
+        if sel_status != '(All)':
+            df_routes = df_routes[df_routes['Status'] == sel_status]
+        df_display = df_routes.copy()
+        df_display['Status'] = df_display['Status'].map(_STATUS_EMOJI).fillna(df_display['Status'])
         st.dataframe(
-            df_routes,
+            df_display,
             use_container_width=True, hide_index=True,
             column_config={
+                "Status":     st.column_config.TextColumn("Status", width="small"),
                 "Compliance": st.column_config.ProgressColumn(
                     "Compliance", format="%.0f%%", min_value=0, max_value=100
                 ),
@@ -169,5 +209,9 @@ else:
                      'Initial_Inv', 'Final_Inv', 'Errors']
         display = s[[c for c in cols_show if c in s.columns]].copy()
         panel_open(f"Stores · {chosen}")
+        sel_status = _status_filter("rd_status_filter")
+        if sel_status != '(All)':
+            display = display[display['Status'] == sel_status]
+        display['Status'] = display['Status'].map(_STATUS_EMOJI).fillna(display['Status'])
         st.dataframe(display, use_container_width=True, hide_index=True)
         panel_close()

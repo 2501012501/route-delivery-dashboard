@@ -8,6 +8,32 @@ from lib.shell import setup
 from lib.theme import (kpi, kpi_grid, page_header,
                         panel_close, panel_open)
 
+
+# Traffic-light status (sent vs delivered). Same labels as the per-store
+# breakdown — kept consistent so the filter pill works for both panels.
+_STATUS_OPTIONS = ['(All)', '🟢 Full', '🟡 Partial', '🔴 Short', '⚪ No sent']
+
+
+def _row_status(sent, compliance_pct) -> str:
+    if sent == 0:
+        return '⚪ No sent'
+    if compliance_pct >= 100:
+        return '🟢 Full'
+    if compliance_pct >= 60:
+        return '🟡 Partial'
+    return '🔴 Short'
+
+
+def _status_filter(key: str) -> str:
+    """Render a horizontal radio for filtering by status. Returns the
+    selected value (with emoji prefix) or '(All)'.
+    """
+    return st.radio(
+        "Status",
+        _STATUS_OPTIONS,
+        horizontal=True, key=key, label_visibility="collapsed",
+    )
+
 st.set_page_config(page_title="Sent vs Delivery", layout="wide", page_icon="📦")
 (inv, dlv, vis, sm, rm, sent), route_cols, f = setup()
 
@@ -85,11 +111,22 @@ if comp[['Sent', 'Delivered']].sum().sum() == 0:
     )
     panel_close()
 else:
+    comp['Status'] = comp.apply(
+        lambda r: _row_status(r['Sent'], r['Compliance']), axis=1
+    )
+
     panel_open("Per route")
+    sel_route_status = _status_filter("svd_route_status")
     comp_show = comp.sort_values('Compliance', ascending=False)
+    if sel_route_status != '(All)':
+        comp_show = comp_show[comp_show['Status'] == sel_route_status]
+    # Put Status first
+    cols_first = ['Status'] + [c for c in comp_show.columns if c != 'Status']
+    comp_show = comp_show[cols_first]
     st.dataframe(
         comp_show, use_container_width=True, hide_index=True,
         column_config={
+            "Status":    st.column_config.TextColumn("Status", width="small"),
             "Compliance": st.column_config.ProgressColumn(
                 "Compliance", format="%.0f%%", min_value=0, max_value=100
             ),
@@ -139,23 +176,9 @@ else:
     if f['store_filter'] != '(All)':
         store_comp = store_comp[store_comp['Store_Number'] == f['store_filter']]
 
-    def _store_status(row):
-        """Traffic-light status for a per-store row.
-        🟢 = delivered ≥ sent (full)         compliance ≥ 100%
-        🟡 = partial delivery                  60% ≤ compliance < 100%
-        🔴 = below 60% delivered               compliance < 60%
-        ⚪ = no sent units recorded            sent = 0
-        """
-        if row['Sent'] == 0:
-            return '⚪ No sent'
-        pct = row['Compliance']
-        if pct >= 100:
-            return '🟢 Full'
-        if pct >= 60:
-            return '🟡 Partial'
-        return '🔴 Short'
-
-    store_comp['Status'] = store_comp.apply(_store_status, axis=1)
+    store_comp['Status'] = store_comp.apply(
+        lambda r: _row_status(r['Sent'], r['Compliance']), axis=1
+    )
 
     store_show = store_comp[
         ['Status', 'Store_Number', 'Route No.', 'CLUSTER FULL', 'CUSTOMER',
@@ -166,7 +189,8 @@ else:
     if store_show.empty:
         st.caption("No stores match the current filters.")
     else:
-        # Counts for the legend
+        # Counts for the legend (computed BEFORE the status filter so the
+        # legend always shows the full population)
         n_full    = int((store_comp['Status'] == '🟢 Full').sum())
         n_partial = int((store_comp['Status'] == '🟡 Partial').sum())
         n_short   = int((store_comp['Status'] == '🔴 Short').sum())
@@ -175,6 +199,9 @@ else:
             f"🟢 Full: **{n_full:,}**  ·  🟡 Partial: **{n_partial:,}**  ·  "
             f"🔴 Short: **{n_short:,}**  ·  ⚪ No sent: **{n_no_sent:,}**"
         )
+        sel_store_status = _status_filter("svd_store_status")
+        if sel_store_status != '(All)':
+            store_show = store_show[store_show['Status'] == sel_store_status]
         st.dataframe(
             store_show, use_container_width=True, hide_index=True,
             column_config={
