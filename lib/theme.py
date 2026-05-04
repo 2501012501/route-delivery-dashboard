@@ -36,11 +36,88 @@ _CSS = f"""
     background: {PAGE_BG};
   }}
 
+  /* Hide Streamlit's default top header for a cleaner webapp feel */
+  header[data-testid="stHeader"] {{
+    display: none;
+  }}
+
   /* Constrain content width so it reads like a real webapp */
   .block-container {{
     max-width: 1280px;
-    padding-top: 2rem;
+    padding-top: 1.5rem;
     padding-bottom: 4rem;
+  }}
+
+  /* ── Top header bar (app shell) ───────────────────────────────────── */
+  .rtd-top-header {{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    background: {SURFACE};
+    border: 1px solid {BORDER};
+    border-radius: 14px;
+    padding: 14px 22px;
+    margin-bottom: 22px;
+    box-shadow: {SHADOW_SM};
+  }}
+  .rtd-brand {{
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }}
+  .rtd-brand-logo {{
+    width: 38px;
+    height: 38px;
+    background: {NAVY};
+    color: {SURFACE};
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 18px;
+    letter-spacing: -0.5px;
+  }}
+  .rtd-brand-name {{
+    font-size: 14px;
+    font-weight: 700;
+    color: {NAVY};
+    line-height: 1.2;
+  }}
+  .rtd-brand-tag {{
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: {SLATE};
+    font-weight: 700;
+    margin-top: 2px;
+  }}
+  .rtd-top-meta {{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }}
+  .rtd-fresh-pill {{
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: {PALE_BLUE};
+    border: 1px solid {PALE_BLUE};
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: {BLUE};
+    font-weight: 700;
+  }}
+  .rtd-fresh-pill .dot {{
+    width: 7px;
+    height: 7px;
+    background: {BLUE};
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px rgba(34, 81, 255, 0.15);
   }}
 
   /* ── Sidebar polish ───────────────────────────────────────────────── */
@@ -283,6 +360,35 @@ _CSS = f"""
 def inject_css():
     """Call once at the top of every page (Home + pages/*) to apply the theme."""
     st.markdown(_CSS, unsafe_allow_html=True)
+
+
+def top_header(fresh_text: str | None = None):
+    """Renders the persistent app header: brand on the left, optional
+    'data freshness' pill on the right. Call from setup() so it appears
+    on every page.
+    """
+    fresh_html = ''
+    if fresh_text:
+        fresh_html = (
+            f'<div class="rtd-top-meta">'
+            f'<span class="rtd-fresh-pill">'
+            f'<span class="dot"></span>{fresh_text}'
+            f'</span>'
+            f'</div>'
+        )
+    st.markdown(
+        f'<div class="rtd-top-header">'
+        f'  <div class="rtd-brand">'
+        f'    <div class="rtd-brand-logo">R</div>'
+        f'    <div>'
+        f'      <div class="rtd-brand-name">Route to Delivery</div>'
+        f'      <div class="rtd-brand-tag">Operations Dashboard</div>'
+        f'    </div>'
+        f'  </div>'
+        f'  {fresh_html}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def page_header(eyebrow: str, title: str, badge: str | None = None,
