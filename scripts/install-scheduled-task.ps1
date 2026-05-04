@@ -32,10 +32,11 @@ if (-not (Test-Path $BatPath)) {
 # Action: run the .bat (which runs Python + git push)
 $Action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$BatPath`""
 
-# Trigger: every hour from 7am to 8pm
-$Trigger = New-ScheduledTaskTrigger -Once -At 7am `
-                                     -RepetitionInterval (New-TimeSpan -Hours 1) `
-                                     -RepetitionDuration (New-TimeSpan -Hours 13)
+# Trigger: every day at 7am, repeating every hour for 13 hours (until 8pm)
+$Trigger = New-ScheduledTaskTrigger -Daily -At 7am
+$Trigger.Repetition = (New-ScheduledTaskTrigger -Once -At 7am `
+                          -RepetitionInterval (New-TimeSpan -Hours 1) `
+                          -RepetitionDuration (New-TimeSpan -Hours 13)).Repetition
 
 # Settings: only run when network available; allow on demand
 $Settings = New-ScheduledTaskSettingsSet `
