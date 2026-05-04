@@ -152,24 +152,63 @@ if col_service is None or col_route_afs is None:
 rm['_days'] = rm[col_service].apply(parse_service_days)
 
 # ── Refresh helpers ──────────────────────────────────────────────────────────
-def _run_script(args, label):
-    """Run a Python script and show the result. Clears cache afterwards."""
+def _publish_to_cloud():
+    """Stage data files, commit, and push to GitHub so Streamlit Cloud redeploys."""
+    project_dir = Path(__file__).parent
+    with st.spinner("Publishing to cloud..."):
+        # Stage data folders (.gitignore filters out CSVs and legacy files)
+        r = subprocess.run(
+            ["git", "add", "data", "Route To Delivery Data"],
+            capture_output=True, text=True, cwd=project_dir,
+        )
+        if r.returncode != 0:
+            st.error(f"git add failed:\n```\n{r.stderr or r.stdout}\n```")
+            return False
+
+        ts = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")
+        r = subprocess.run(
+            ["git", "commit", "-m", f"Auto: data update {ts}"],
+            capture_output=True, text=True, cwd=project_dir,
+        )
+        if r.returncode != 0:
+            combined = (r.stdout + r.stderr).lower()
+            if "nothing to commit" in combined or "nothing added" in combined:
+                st.info("ℹ️ No data changes to publish.")
+                return True
+            st.error(f"git commit failed:\n```\n{r.stderr or r.stdout}\n```")
+            return False
+
+        r = subprocess.run(
+            ["git", "push"],
+            capture_output=True, text=True, cwd=project_dir,
+        )
+        if r.returncode != 0:
+            st.error(f"git push failed:\n```\n{r.stderr or r.stdout}\n```")
+            return False
+    st.success("☁️ Published to cloud — Streamlit will update in ~1 min")
+    return True
+
+
+def _run_script(args, label, publish=False):
+    """Run a Python script. Optionally publish to cloud after success."""
     project_dir = Path(__file__).parent
     with st.spinner(f"Refreshing {label}..."):
         r = subprocess.run(
             [sys.executable, *args],
             capture_output=True, text=True, cwd=project_dir,
         )
-    st.cache_data.clear()
-    if r.returncode == 0:
-        st.success(f"{label} refreshed ✓")
-        st.rerun()
-    else:
+    if r.returncode != 0:
         st.error(f"Error refreshing {label}:\n```\n{(r.stderr or r.stdout)[-1000:]}\n```")
+        return
+    st.success(f"{label} refreshed ✓")
+    if publish:
+        _publish_to_cloud()
+    st.cache_data.clear()
+    st.rerun()
 
 
-def _run_chain(steps):
-    """Run several scripts in order, stopping if any fails."""
+def _run_chain(steps, publish=False):
+    """Run several scripts in order. Optionally publish to cloud after success."""
     project_dir = Path(__file__).parent
     for args, label in steps:
         with st.spinner(f"Refreshing {label}..."):
@@ -180,8 +219,10 @@ def _run_chain(steps):
         if r.returncode != 0:
             st.error(f"{label} failed:\n```\n{(r.stderr or r.stdout)[-1500:]}\n```")
             return
-    st.cache_data.clear()
     st.success("Refreshed ✓")
+    if publish:
+        _publish_to_cloud()
+    st.cache_data.clear()
     st.rerun()
 
 
@@ -199,19 +240,25 @@ with st.sidebar:
         st.caption("🌐 **Read-only view** — refresh disabled in cloud. "
                    "Data updated when the owner pushes new files.")
     else:
+        auto_publish = st.checkbox(
+            "☁️ Auto-publish to cloud after refresh", value=True,
+            help="After refreshing, push data to GitHub so the Streamlit Cloud "
+                 "link updates automatically for everyone.",
+        )
+
         rb1, rb2, rb3 = st.columns(3)
         if rb1.button("🔁 API", use_container_width=True,
                       help="Re-download inventory/delivery/visits from Retex (~1-2 min)"):
-            _run_script(["RouteToDelivery.py"], "API")
+            _run_script(["RouteToDelivery.py"], "API", publish=auto_publish)
         if rb2.button("📋 Masters", use_container_width=True,
                       help="Re-download Route Master from SharePoint"):
-            _run_script(["extract.py", "--route-master"], "Route Master")
+            _run_script(["extract.py", "--route-master"], "Route Master", publish=auto_publish)
         if rb3.button("📦 Sent", use_container_width=True,
                       help="Re-download deliveries from on-prem SQL and run Transform.py"):
             _run_chain([
                 (["extract.py", "--deliveries"], "Deliveries SQL"),
                 (["Transform.py"],               "Transform"),
-            ])
+            ], publish=auto_publish)
 
         # ── Share link with team (LAN) ───────────────────────────────────────
         try:
