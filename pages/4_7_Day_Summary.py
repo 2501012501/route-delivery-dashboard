@@ -10,7 +10,7 @@ import streamlit as st
 
 from lib.filters import apply_filters
 from lib.shell import setup
-from lib.theme import (SLATE, eyebrow_title, kpi, kpi_grid,
+from lib.theme import (SLATE, kpi, kpi_grid, page_header,
                         panel_close, panel_open)
 
 st.set_page_config(page_title="7-Day Summary", layout="wide", page_icon="📊")
@@ -19,13 +19,11 @@ st.set_page_config(page_title="7-Day Summary", layout="wide", page_icon="📊")
 target_date = f['target_date']
 week_start  = target_date - timedelta(days=6)
 
-eyebrow_title("7-Day Summary", "Last 7 days · executive view")
-st.markdown(
-    f'<div style="font-size:12px;color:{SLATE};margin-bottom:12px;">'
-    f'Period: <b>{week_start.strftime("%a %b %d")}</b> → <b>{target_date.strftime("%a %b %d")}</b> '
-    f'· Sidebar filters apply (Date is replaced by this 7-day window).'
-    f'</div>',
-    unsafe_allow_html=True,
+page_header(
+    eyebrow="7-Day Summary",
+    title="Last 7 Days · Executive View",
+    badge=f"{week_start.strftime('%b %d')} → {target_date.strftime('%b %d')}",
+    subtitle="Sidebar filters apply. Date is replaced by this 7-day window on this page.",
 )
 
 # 1) Filter all sources to the 7-day window

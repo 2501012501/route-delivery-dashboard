@@ -4,13 +4,18 @@ import streamlit as st
 from lib.compute import latest_per
 from lib.filters import apply_filters, routes_for_day
 from lib.shell import setup
-from lib.theme import (eyebrow_title, kpi, kpi_grid,
+from lib.theme import (kpi, kpi_grid, page_header,
                         panel_close, panel_open)
 
 st.set_page_config(page_title="Sent vs Delivery", layout="wide", page_icon="📦")
 (inv, dlv, vis, sm, rm, sent), route_cols, f = setup()
 
-eyebrow_title("Sent vs Delivery", f"Warehouse vs driver totals · {f['target_date'].strftime('%a %b %d, %Y')}")
+page_header(
+    eyebrow="Sent vs Delivery",
+    title="Warehouse vs Driver Totals",
+    badge=f['target_date'].strftime('%a · %b %d, %Y'),
+    subtitle="DELIVERY UNITS sent from warehouse vs DeliveredBunches recorded by drivers.",
+)
 
 if sent is None:
     panel_open()

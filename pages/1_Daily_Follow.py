@@ -7,7 +7,7 @@ from lib.compute import (cluster_compliance_data, latest_per,
 from lib.filters import apply_filters, routes_for_day
 from lib.shell import setup
 from lib.theme import (NAVY, BLUE, PALE_BLUE, BORDER, SLATE,
-                        eyebrow_title, kpi, kpi_grid,
+                        kpi, kpi_grid, page_header,
                         panel_close, panel_open, pill)
 
 st.set_page_config(page_title="Daily Follow", layout="wide", page_icon="📅")
@@ -57,7 +57,12 @@ if not routes_today.empty:
     in_progress_count = int((s_all['Status'] == 'In progress').sum())
     pending_count     = int((s_all['Status'] == 'Pending').sum())
 
-eyebrow_title("Daily Follow", f"Visit compliance · {f['target_date'].strftime('%a %b %d, %Y')}")
+page_header(
+    eyebrow="Daily Follow",
+    title="Visit Compliance",
+    badge=f['target_date'].strftime('%a · %b %d, %Y'),
+    subtitle="Per-route and per-store compliance for the selected day.",
+)
 
 kpi_grid(
     kpi("Planned",      f"{total_expected:,}"),

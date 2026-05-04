@@ -4,18 +4,17 @@ import streamlit as st
 from lib.compute import latest_per
 from lib.filters import apply_filters
 from lib.shell import setup
-from lib.theme import (SLATE, eyebrow_title, kpi, kpi_grid,
+from lib.theme import (SLATE, kpi, kpi_grid, page_header,
                         panel_close, panel_open)
 
 st.set_page_config(page_title="Errors", layout="wide", page_icon="⚠️")
 (inv, dlv, vis, sm, rm, sent), route_cols, f = setup()
 
-eyebrow_title("Errors", f"Inventory mismatches · {f['target_date'].strftime('%a %b %d, %Y')}")
-st.markdown(
-    f'<div style="font-size:12px;color:{SLATE};margin-bottom:12px;">'
-    f'Difference = Initial Inventory + Delivered − Credits − Final Inventory'
-    f'</div>',
-    unsafe_allow_html=True,
+page_header(
+    eyebrow="Errors",
+    title="Inventory Mismatches",
+    badge=f['target_date'].strftime('%a · %b %d, %Y'),
+    subtitle="Difference = Initial Inventory + Delivered − Credits − Final Inventory.",
 )
 
 inv_d = apply_filters(inv[inv['Answer_Date']  == f['target_date']], f).copy()

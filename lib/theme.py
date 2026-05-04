@@ -2,127 +2,243 @@
 
 All HTML uses st.markdown(..., unsafe_allow_html=True). The CSS injection
 happens once per session via inject_css(); pages call the helpers
-(kpi, pill, panel, eyebrow_title) to render consistent UI.
+(page_header, kpi, pill, panel) to render consistent UI.
 """
 import streamlit as st
 
-# Palette (McKinsey blue)
-NAVY      = "#051C2C"
-BLUE      = "#2251FF"
-PALE_BLUE = "#EDF2FE"
-SLATE     = "#64748B"
-PAGE_BG   = "#FAFBFC"
-SURFACE   = "#FFFFFF"
-BORDER    = "#E5E7EB"
-AMBER_BG  = "#FEF3C7"
-AMBER_FG  = "#92400E"
-GRAY_BG   = "#F1F5F9"
+# ── Palette (McKinsey blue) ──────────────────────────────────────────────────
+NAVY       = "#051C2C"   # primary text, page titles
+NAVY_DEEP  = "#020E16"   # darker for headers
+BLUE       = "#2251FF"   # accent
+BLUE_DARK  = "#1A3FCC"   # accent-hover
+PALE_BLUE  = "#EDF2FE"   # pill backgrounds, hover tints
+SOFT_BLUE  = "#F7F9FF"   # very subtle accent area
+SLATE      = "#64748B"   # secondary text, eyebrow labels
+SLATE_LIGHT = "#94A3B8"  # tertiary text
+PAGE_BG    = "#F6F7F9"   # body background (slightly more contrast than before)
+SURFACE    = "#FFFFFF"   # cards, panels
+BORDER     = "#E5E7EB"   # default borders
+BORDER_SOFT = "#EEF1F4"  # softer dividers
+AMBER_BG   = "#FEF3C7"
+AMBER_FG   = "#92400E"
+GRAY_BG    = "#F1F5F9"
+
+# Shadows — layered for realistic depth
+SHADOW_SM = "0 1px 2px rgba(5,28,44,0.05)"
+SHADOW_MD = "0 1px 3px rgba(5,28,44,0.05), 0 4px 12px rgba(5,28,44,0.04)"
+SHADOW_LG = "0 4px 16px rgba(5,28,44,0.08), 0 1px 3px rgba(5,28,44,0.04)"
 
 
 _CSS = f"""
 <style>
-  /* ── Sidebar ────────────────────────────────────────────── */
+  /* ── App background slightly warmer for card contrast ─────────────── */
+  .stApp {{
+    background: {PAGE_BG};
+  }}
+
+  /* Constrain content width so it reads like a real webapp */
+  .block-container {{
+    max-width: 1280px;
+    padding-top: 2rem;
+    padding-bottom: 4rem;
+  }}
+
+  /* ── Sidebar polish ───────────────────────────────────────────────── */
   section[data-testid="stSidebar"] {{
     background: {SURFACE};
     border-right: 1px solid {BORDER};
+    box-shadow: {SHADOW_SM};
+  }}
+  section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a {{
+    border-radius: 8px;
+    margin: 2px 0;
+    transition: background .15s ease;
+  }}
+  section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a:hover {{
+    background: {PALE_BLUE};
   }}
   section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"] {{
     background: {PALE_BLUE};
     color: {BLUE};
     font-weight: 600;
-    border-radius: 6px;
   }}
-
-  /* ── Eyebrow + title ─────────────────────────────────────── */
-  .rtd-eyebrow {{
-    text-transform: uppercase;
-    letter-spacing: 1.2px;
-    font-size: 11px;
-    color: {BLUE};
-    font-weight: 600;
-  }}
-  .rtd-title {{
-    margin: 6px 0 16px 0;
-    color: {NAVY};
-    font-weight: 600;
-    font-size: 22px;
-  }}
-
-  /* ── KPI cards ──────────────────────────────────────────── */
-  .rtd-kpi-grid {{
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 12px;
-    margin: 8px 0 16px 0;
-  }}
-  .rtd-kpi {{
-    background: {SURFACE};
-    border: 1px solid {BORDER};
-    border-radius: 10px;
-    padding: 14px;
-  }}
-  .rtd-kpi.accent {{ border-left: 3px solid {BLUE}; }}
-  .rtd-kpi-label {{
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: {SLATE};
-  }}
-  .rtd-kpi-value {{
-    font-size: 24px;
-    font-weight: 700;
-    color: {NAVY};
-    margin-top: 4px;
-  }}
-  .rtd-kpi.accent .rtd-kpi-value {{ color: {BLUE}; }}
-
-  /* ── Panels ─────────────────────────────────────────────── */
-  .rtd-panel {{
-    background: {SURFACE};
-    border: 1px solid {BORDER};
-    border-radius: 10px;
-    padding: 18px;
-    margin: 8px 0;
-  }}
-  .rtd-panel-title {{
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: {SLATE};
-    margin-bottom: 8px;
-  }}
-
-  /* ── Pills ──────────────────────────────────────────────── */
-  .rtd-pill {{
-    display: inline-block;
-    padding: 3px 9px;
-    border-radius: 12px;
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-  }}
-  .rtd-pill.ok    {{ background: {PALE_BLUE}; color: {BLUE}; }}
-  .rtd-pill.warn  {{ background: {AMBER_BG}; color: {AMBER_FG}; }}
-  .rtd-pill.pend  {{ background: {GRAY_BG}; color: {SLATE}; }}
-
-  /* ── Sidebar headers uniform (UPPERCASE small caps style) ── */
   section[data-testid="stSidebar"] h2,
   section[data-testid="stSidebar"] h3 {{
     text-transform: uppercase;
     letter-spacing: 0.8px;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
-    color: {NAVY};
-    margin-top: 8px;
+    color: {SLATE};
+    margin: 16px 0 6px 0;
   }}
-  /* Sidebar widget labels (Date, Cluster, Customer, ...) uppercase too */
   section[data-testid="stSidebar"] label p {{
     text-transform: uppercase;
     letter-spacing: 0.6px;
     font-size: 10px;
     font-weight: 600;
     color: {SLATE};
+  }}
+  section[data-testid="stSidebar"] hr {{
+    border-color: {BORDER_SOFT};
+    margin: 14px 0;
+  }}
+
+  /* ── Page header ──────────────────────────────────────────────────── */
+  .rtd-page-header {{
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 4px 0 18px 0;
+    margin-bottom: 18px;
+    border-bottom: 1px solid {BORDER};
+  }}
+  .rtd-page-header-left {{ flex: 1; min-width: 0; }}
+  .rtd-eyebrow {{
+    display: inline-block;
+    text-transform: uppercase;
+    letter-spacing: 1.4px;
+    font-size: 11px;
+    color: {BLUE};
+    font-weight: 700;
+    background: {PALE_BLUE};
+    padding: 4px 10px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+  }}
+  .rtd-title {{
+    margin: 0;
+    color: {NAVY};
+    font-weight: 700;
+    font-size: 28px;
+    letter-spacing: -0.4px;
+    line-height: 1.2;
+  }}
+  .rtd-subtitle {{
+    margin: 6px 0 0 0;
+    color: {SLATE};
+    font-size: 13px;
+    font-weight: 500;
+  }}
+  .rtd-badge {{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: {SURFACE};
+    border: 1px solid {BORDER};
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: {NAVY};
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    box-shadow: {SHADOW_SM};
+    white-space: nowrap;
+  }}
+  .rtd-badge .dot {{
+    width: 6px; height: 6px; background: {BLUE};
+    border-radius: 50%;
+  }}
+
+  /* ── KPI cards ────────────────────────────────────────────────────── */
+  .rtd-kpi-grid {{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin: 8px 0 20px 0;
+  }}
+  .rtd-kpi {{
+    background: {SURFACE};
+    border: 1px solid {BORDER};
+    border-radius: 14px;
+    padding: 16px 18px;
+    box-shadow: {SHADOW_SM};
+    transition: box-shadow .2s ease, transform .2s ease, border-color .2s ease;
+    position: relative;
+  }}
+  .rtd-kpi:hover {{
+    box-shadow: {SHADOW_LG};
+    transform: translateY(-1px);
+    border-color: {BORDER};
+  }}
+  .rtd-kpi.accent {{
+    border-color: {BLUE};
+    background: linear-gradient(180deg, {SOFT_BLUE} 0%, {SURFACE} 70%);
+  }}
+  .rtd-kpi.accent::before {{
+    content: '';
+    position: absolute;
+    top: 0; left: 18px; right: 18px;
+    height: 3px;
+    background: {BLUE};
+    border-radius: 0 0 3px 3px;
+  }}
+  .rtd-kpi-label {{
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: {SLATE};
+    font-weight: 700;
+  }}
+  .rtd-kpi-value {{
+    font-size: 28px;
+    font-weight: 700;
+    color: {NAVY};
+    margin-top: 6px;
+    letter-spacing: -0.6px;
+    line-height: 1.1;
+  }}
+  .rtd-kpi.accent .rtd-kpi-value {{ color: {BLUE}; }}
+
+  /* ── Panels ──────────────────────────────────────────────────────── */
+  .rtd-panel {{
+    background: {SURFACE};
+    border: 1px solid {BORDER};
+    border-radius: 14px;
+    padding: 22px;
+    margin: 14px 0;
+    box-shadow: {SHADOW_MD};
+  }}
+  .rtd-panel-title {{
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: {SLATE};
+    font-weight: 700;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid {BORDER_SOFT};
+  }}
+
+  /* ── Pills ───────────────────────────────────────────────────────── */
+  .rtd-pill {{
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+  }}
+  .rtd-pill.ok    {{ background: {PALE_BLUE}; color: {BLUE}; }}
+  .rtd-pill.warn  {{ background: {AMBER_BG}; color: {AMBER_FG}; }}
+  .rtd-pill.pend  {{ background: {GRAY_BG}; color: {SLATE}; }}
+
+  /* ── Streamlit dataframe polish ───────────────────────────────────── */
+  [data-testid="stDataFrame"] {{
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid {BORDER};
+  }}
+
+  /* ── Streamlit metric polish (used in older areas) ────────────────── */
+  [data-testid="stMetric"] {{
+    background: {SURFACE};
+    border: 1px solid {BORDER};
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: {SHADOW_SM};
   }}
 </style>
 """
@@ -133,13 +249,31 @@ def inject_css():
     st.markdown(_CSS, unsafe_allow_html=True)
 
 
-def eyebrow_title(eyebrow: str, title: str):
-    """Renders the page header pair: small uppercase blue eyebrow + big navy title."""
+def page_header(eyebrow: str, title: str, badge: str | None = None,
+                 subtitle: str | None = None):
+    """Renders the unified page header: eyebrow chip + Title Case title +
+    optional date badge on the right + optional subtitle below.
+    """
+    badge_html = ''
+    if badge:
+        badge_html = f'<span class="rtd-badge"><span class="dot"></span>{badge}</span>'
+    subtitle_html = f'<div class="rtd-subtitle">{subtitle}</div>' if subtitle else ''
     st.markdown(
-        f'<div class="rtd-eyebrow">{eyebrow}</div>'
-        f'<div class="rtd-title">{title}</div>',
+        f'<div class="rtd-page-header">'
+        f'  <div class="rtd-page-header-left">'
+        f'    <span class="rtd-eyebrow">{eyebrow}</span>'
+        f'    <div class="rtd-title">{title}</div>'
+        f'    {subtitle_html}'
+        f'  </div>'
+        f'  {badge_html}'
+        f'</div>',
         unsafe_allow_html=True,
     )
+
+
+def eyebrow_title(eyebrow: str, title: str):
+    """Backwards-compatible alias for page_header without badge."""
+    page_header(eyebrow, title)
 
 
 def kpi(label: str, value: str, accent: bool = False) -> str:
