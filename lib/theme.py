@@ -357,19 +357,26 @@ _CSS = f"""
   /* ── Sidebar refresh buttons (API / Masters / Sent) ───────────────── */
   section[data-testid="stSidebar"] [data-testid="stButton"] button {{
     text-transform: uppercase;
-    letter-spacing: 0.6px;
-    font-size: 11px;
+    letter-spacing: 0.3px;
+    font-size: 10px;
     font-weight: 700;
+    padding: 8px 4px;
+    min-height: 0;
     border-radius: 8px;
     border: 1px solid {BORDER};
     background: {SURFACE};
     color: {NAVY};
+    white-space: nowrap;
     transition: background .15s ease, border-color .15s ease, color .15s ease;
   }}
   section[data-testid="stSidebar"] [data-testid="stButton"] button:hover {{
     background: {PALE_BLUE};
     border-color: {BLUE};
     color: {BLUE};
+  }}
+  /* Tighten the gap between the 3 buttons so they have a bit more room */
+  section[data-testid="stSidebar"] [data-testid="stHorizontalBlock"] {{
+    gap: 6px !important;
   }}
 </style>
 """
