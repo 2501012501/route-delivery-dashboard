@@ -101,8 +101,43 @@ def is_cloud() -> bool:
     return ('/mount/src/' in os.getcwd()) or bool(os.environ.get('STREAMLIT_RUNTIME'))
 
 
+def _log(msg: str):
+    """Append a line to logs/auto-refresh.log so we have evidence of what
+    happened even if the Streamlit UI cleared the message on rerun."""
+    log_path = Path(__file__).parent.parent / "logs" / "auto-refresh.log"
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with log_path.open("a", encoding="utf-8") as fh:
+            stamp = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+            fh.write(f"[{stamp}] {msg}\n")
+    except Exception:
+        pass  # logging must never break the app
+
+
+def _stash_publish_status(kind: str, msg: str):
+    """Persist the publish outcome across st.rerun() via session_state."""
+    st.session_state['_rtd_publish_status'] = {'kind': kind, 'msg': msg}
+
+
+def render_publish_status():
+    """Display the persisted publish status (if any) and clear it. Call this
+    inside render_refresh_section so the user sees feedback that survives reruns.
+    """
+    s = st.session_state.pop('_rtd_publish_status', None)
+    if not s:
+        return
+    if s['kind'] == 'success':
+        st.success(s['msg'])
+    elif s['kind'] == 'info':
+        st.info(s['msg'])
+    else:
+        st.error(s['msg'])
+
+
 def _publish_to_cloud() -> bool:
-    """Stage data files, commit, push to GitHub so Streamlit Cloud redeploys."""
+    """Stage data files, commit, push to GitHub so Streamlit Cloud redeploys.
+    Persists the outcome to session_state so the user sees it after st.rerun().
+    """
     project_dir = Path(__file__).parent.parent
     with st.spinner("Publishing to cloud..."):
         r = subprocess.run(
@@ -110,7 +145,9 @@ def _publish_to_cloud() -> bool:
             capture_output=True, text=True, cwd=project_dir,
         )
         if r.returncode != 0:
-            st.error(f"git add failed:\n```\n{r.stderr or r.stdout}\n```")
+            err = f"git add failed:\n{r.stderr or r.stdout}"
+            _log("ERROR: " + err.replace("\n", " | "))
+            _stash_publish_status('error', err)
             return False
 
         ts = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")
@@ -121,9 +158,12 @@ def _publish_to_cloud() -> bool:
         if r.returncode != 0:
             combined = (r.stdout + r.stderr).lower()
             if "nothing to commit" in combined or "nothing added" in combined:
-                st.info("ℹ️ No data changes to publish.")
+                _log("INFO: no data changes to publish")
+                _stash_publish_status('info', "ℹ️ No data changes to publish.")
                 return True
-            st.error(f"git commit failed:\n```\n{r.stderr or r.stdout}\n```")
+            err = f"git commit failed:\n{r.stderr or r.stdout}"
+            _log("ERROR: " + err.replace("\n", " | "))
+            _stash_publish_status('error', err)
             return False
 
         r = subprocess.run(
@@ -131,9 +171,13 @@ def _publish_to_cloud() -> bool:
             capture_output=True, text=True, cwd=project_dir,
         )
         if r.returncode != 0:
-            st.error(f"git push failed:\n```\n{r.stderr or r.stdout}\n```")
+            err = f"git push failed:\n{r.stderr or r.stdout}"
+            _log("ERROR: " + err.replace("\n", " | "))
+            _stash_publish_status('error', err)
             return False
-    st.success("☁️ Published to cloud — Streamlit will update in ~1 min")
+
+    _log(f"OK: published Auto: data update {ts}")
+    _stash_publish_status('success', "☁️ Published to cloud — Streamlit will update in ~1 min")
     return True
 
 
@@ -184,12 +228,23 @@ def render_refresh_section(last_visit, *, vis=None):
     epoch_data = _data_freshness_epoch(vis=vis)
     epoch_file = _file_mtime_epoch()
 
+    # If a recent publish errored, surface it OUTSIDE the expander so the
+    # user notices without having to open the Data section.
+    pending = st.session_state.get('_rtd_publish_status')
+    if pending and pending['kind'] == 'error':
+        st.error(f"⚠️ Auto-publish failed:\n{pending['msg']}")
+
     if epoch_data is not None:
         label = f"📡 Data · Updated {_format_ago(epoch_data)}"
     else:
         label = "📡 Data"
+    if pending and pending['kind'] == 'error':
+        label = "📡 Data · ⚠️ publish failed"
 
     with st.expander(label, expanded=False):
+        # Show any non-error publish status (success / info) that survived the rerun
+        render_publish_status()
+
         # Detailed freshness lines (in business timezone)
         if epoch_data is not None:
             ts = (pd.Timestamp(epoch_data, unit='s', tz='UTC')
