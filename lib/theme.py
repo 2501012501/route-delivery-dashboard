@@ -49,18 +49,54 @@ _CSS = f"""
     border-right: 1px solid {BORDER};
     box-shadow: {SHADOW_SM};
   }}
+
+  /* ── Sidebar nav (page menu at the top) ───────────────────────────── */
+  section[data-testid="stSidebar"] [data-testid="stSidebarNav"] {{
+    background: {SOFT_BLUE};
+    padding: 14px 10px 12px 10px;
+    margin: -4px -16px 12px -16px;
+    border-bottom: 1px solid {BORDER_SOFT};
+  }}
+  section[data-testid="stSidebar"] [data-testid="stSidebarNav"]::before {{
+    content: 'Pages';
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: {SLATE};
+    padding: 0 8px 8px 8px;
+  }}
+  section[data-testid="stSidebar"] [data-testid="stSidebarNav"] ul {{
+    padding: 0;
+  }}
+  /* Hide the Home redirect entry — it's noise, dashboard lands on Daily Follow directly */
+  section[data-testid="stSidebar"] [data-testid="stSidebarNav"] li:first-child {{
+    display: none;
+  }}
   section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a {{
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    font-size: 11px;
+    font-weight: 700;
+    color: {SLATE};
     border-radius: 8px;
+    padding: 10px 12px;
     margin: 2px 0;
-    transition: background .15s ease;
+    border-left: 3px solid transparent;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+  }}
+  section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a span {{
+    color: inherit !important;
   }}
   section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a:hover {{
     background: {PALE_BLUE};
+    color: {NAVY};
   }}
   section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"] {{
     background: {PALE_BLUE};
     color: {BLUE};
-    font-weight: 600;
+    border-left-color: {BLUE};
   }}
   section[data-testid="stSidebar"] h2,
   section[data-testid="stSidebar"] h3 {{
