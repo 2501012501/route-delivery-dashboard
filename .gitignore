@@ -1,0 +1,37 @@
+# Environment / secrets — NEVER commit
+.env
+.env.*
+!.env.example
+token_cache.bin
+.streamlit/secrets.toml
+
+# Cloudflare binary (large, machine-specific)
+cloudflared.exe
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Data: keep parquets needed by dashboard, exclude bulky CSVs and legacy files
+*.csv
+data/orders_raw.parquet
+data/pack_sizes.parquet
+data/qkt_sales.parquet
+data/sales.parquet
+data/sales_raw.parquet
+data/date_master.parquet
+data/deliveries_raw.parquet
+
+# Logs
+*.log
