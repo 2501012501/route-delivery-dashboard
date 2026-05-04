@@ -5,20 +5,13 @@ import streamlit as st
 from lib.compute import (cluster_compliance_data, latest_per,
                           store_day_summary, store_status)
 from lib.filters import apply_filters, routes_for_day
+from lib.shell import setup
 from lib.theme import (NAVY, BLUE, PALE_BLUE, BORDER, SLATE,
-                        eyebrow_title, inject_css, kpi, kpi_grid,
+                        eyebrow_title, kpi, kpi_grid,
                         panel_close, panel_open, pill)
 
 st.set_page_config(page_title="Daily Follow", layout="wide", page_icon="📅")
-inject_css()
-
-if '_rtd_data' not in st.session_state:
-    st.error("Open from the Home page first (`streamlit run Home.py`).")
-    st.stop()
-
-inv, dlv, vis, sm, rm, sent = st.session_state['_rtd_data']
-route_cols = st.session_state['_rtd_routes']
-f          = st.session_state['_rtd_filters']
+(inv, dlv, vis, sm, rm, sent), route_cols, f = setup()
 
 # Day-filtered fact frames first (needed to compute "active" routes).
 inv_d = apply_filters(inv[inv['Answer_Date']  == f['target_date']], f).copy()

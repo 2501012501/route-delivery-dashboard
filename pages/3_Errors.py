@@ -3,19 +3,12 @@ import streamlit as st
 
 from lib.compute import latest_per
 from lib.filters import apply_filters
-from lib.theme import (SLATE, eyebrow_title, inject_css, kpi, kpi_grid,
+from lib.shell import setup
+from lib.theme import (SLATE, eyebrow_title, kpi, kpi_grid,
                         panel_close, panel_open)
 
 st.set_page_config(page_title="Errors", layout="wide", page_icon="⚠️")
-inject_css()
-
-if '_rtd_data' not in st.session_state:
-    st.error("Open from the Home page first (`streamlit run Home.py`).")
-    st.stop()
-
-inv, dlv, vis, sm, rm, sent = st.session_state['_rtd_data']
-route_cols = st.session_state['_rtd_routes']
-f          = st.session_state['_rtd_filters']
+(inv, dlv, vis, sm, rm, sent), route_cols, f = setup()
 
 eyebrow_title("Errors", f"Inventory mismatches · {f['target_date'].strftime('%a %b %d, %Y')}")
 st.markdown(

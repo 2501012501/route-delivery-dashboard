@@ -1,12 +1,15 @@
-"""Refresh buttons + cloud publish + share-with-team. Hidden on cloud."""
+"""Refresh buttons + cloud publish + public-link sharing. Refresh hidden on cloud."""
 import os
-import socket
 import subprocess
 import sys
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+
+# Public Streamlit Cloud deployment — anyone with this URL can view the
+# dashboard from any browser (read-only view, no VPN required).
+PUBLIC_URL = "https://route-delivery-dashboard-2bkfhlh7k2cbycdkrmisnu.streamlit.app"
 
 
 def is_cloud() -> bool:
@@ -122,26 +125,10 @@ def render_refresh_section(last_visit):
             (["Transform.py"],               "Transform"),
         ], publish=auto_publish)
 
-    try:
-        port = int(st.get_option('server.port'))
-    except Exception:
-        port = 8501
-    hostname = socket.gethostname().lower()
-    local_ips = []
-    try:
-        local_ips = [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2]
-                     if not ip.startswith('127.')]
-    except Exception:
-        pass
-
-    with st.expander("🔗 Share with team"):
-        st.caption("Send this link to your team (must be on the Falcon VPN):")
-        st.code(f"http://{hostname}:{port}", language=None)
-        if local_ips:
-            st.caption("Or use IP directly:")
-            for ip in local_ips:
-                st.code(f"http://{ip}:{port}", language=None)
+    with st.expander("🌐 Public link"):
+        st.caption("Send this link to your team — works from any browser, no VPN needed:")
+        st.code(PUBLIC_URL, language=None)
         st.caption(
-            "ℹ️ Your laptop must stay on and connected to the Falcon VPN "
-            "for the link to work."
+            "ℹ️ The cloud version updates automatically when Auto-publish is on "
+            "and you click any of the refresh buttons above."
         )
