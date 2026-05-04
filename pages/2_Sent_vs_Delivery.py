@@ -1,4 +1,5 @@
 """Sent vs Delivery — warehouse units vs driver-recorded bunches."""
+import pandas as pd
 import streamlit as st
 
 from lib.compute import latest_per
@@ -97,4 +98,67 @@ else:
             "Diff":      st.column_config.NumberColumn(format="%+d"),
         },
     )
+    panel_close()
+
+    # Per-store breakdown — same comparison, store granularity
+    sent_by_store = sent_d.groupby('Store_Number', dropna=False)['DELIVERY UNITS'].sum().rename('Sent')
+    delivered_by_store = (
+        dlv_latest[dlv_latest['Document_Type_Name'] == 'Delivery']
+        .groupby('Store_Number', dropna=False)['DeliveredBunches'].sum().rename('Delivered')
+    )
+    store_meta = sm[['Store_Number', 'Route_ID_AFS', 'CUSTOMER', 'CLUSTER FULL']].copy()
+    store_meta = store_meta.merge(
+        rm[[route_cols['route_afs'], route_cols['route_no']]].rename(
+            columns={route_cols['route_afs']: 'Route_ID_AFS',
+                     route_cols['route_no']:  'Route No.'}
+        ),
+        on='Route_ID_AFS', how='left',
+    )
+
+    store_comp = (
+        pd.concat([sent_by_store, delivered_by_store], axis=1)
+          .reset_index()
+          .merge(store_meta, on='Store_Number', how='left')
+    )
+    store_comp[['Sent', 'Delivered']] = store_comp[['Sent', 'Delivered']].fillna(0)
+    store_comp = store_comp[(store_comp['Sent'] > 0) | (store_comp['Delivered'] > 0)]
+    store_comp['Diff'] = store_comp['Delivered'] - store_comp['Sent']
+    store_comp['Compliance'] = store_comp.apply(
+        lambda r: (r['Delivered'] / r['Sent'] * 100) if r['Sent'] > 0 else 0, axis=1
+    )
+
+    # Apply sidebar filters at the store level too
+    if f['cluster_filter'] != '(All)':
+        store_comp = store_comp[
+            store_comp['CLUSTER FULL'].astype(str).str.strip().str.upper() == f['cluster_filter']
+        ]
+    if f['customer_filter'] != '(All)':
+        store_comp = store_comp[store_comp['CUSTOMER'] == f['customer_filter']]
+    if f['route_filter'] != '(All)':
+        store_comp = store_comp[store_comp['Route_ID_AFS'] == f['route_filter']]
+    if f['store_filter'] != '(All)':
+        store_comp = store_comp[store_comp['Store_Number'] == f['store_filter']]
+
+    store_show = store_comp[
+        ['Store_Number', 'Route No.', 'CLUSTER FULL', 'CUSTOMER', 'Sent', 'Delivered', 'Diff', 'Compliance']
+    ].sort_values('Diff', key=lambda x: x.abs(), ascending=False)
+
+    panel_open("Per store")
+    if store_show.empty:
+        st.caption("No stores match the current filters.")
+    else:
+        st.caption(f"{len(store_show):,} stores · sorted by largest variance first")
+        st.dataframe(
+            store_show, use_container_width=True, hide_index=True,
+            column_config={
+                "Compliance": st.column_config.ProgressColumn(
+                    "Compliance", format="%.0f%%", min_value=0, max_value=100
+                ),
+                "Sent":      st.column_config.NumberColumn(format="%d"),
+                "Delivered": st.column_config.NumberColumn(format="%d"),
+                "Diff":      st.column_config.NumberColumn(
+                    format="%+d", help="Delivered − Sent. Negative = under-delivery"
+                ),
+            },
+        )
     panel_close()
