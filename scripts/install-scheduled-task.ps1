@@ -19,7 +19,7 @@ if ($Uninstall) {
         Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
         Write-Host "Removed task '$TaskName'."
     } else {
-        Write-Host "Task '$TaskName' not found — nothing to remove."
+        Write-Host "Task '$TaskName' not found - nothing to remove."
     }
     return
 }
@@ -37,7 +37,7 @@ $Trigger = New-ScheduledTaskTrigger -Once -At 7am `
                                      -RepetitionInterval (New-TimeSpan -Hours 1) `
                                      -RepetitionDuration (New-TimeSpan -Hours 13)
 
-# Settings: only run when on AC power + network available; allow on demand
+# Settings: only run when network available; allow on demand
 $Settings = New-ScheduledTaskSettingsSet `
     -StartWhenAvailable `
     -DontStopOnIdleEnd `
@@ -56,11 +56,11 @@ Register-ScheduledTask -TaskName $TaskName `
                        -Trigger $Trigger `
                        -Settings $Settings `
                        -Principal $Principal `
-                       -Description "Hourly auto-refresh of Route to Delivery dashboard data + push to GitHub for Streamlit Cloud."
+                       -Description "Hourly auto-refresh of Route to Delivery dashboard data and push to GitHub for Streamlit Cloud."
 
 Write-Host ""
 Write-Host "Task '$TaskName' installed." -ForegroundColor Green
-Write-Host "Schedule: every hour, 7:00 AM - 8:00 PM (Central)."
+Write-Host "Schedule: every hour, 7:00 AM to 8:00 PM (Central)."
 Write-Host "Logs:     $ScriptDir\..\logs\auto-refresh.log"
 Write-Host ""
 Write-Host "To run it once now from PowerShell:"
