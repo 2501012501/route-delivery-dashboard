@@ -353,6 +353,24 @@ _CSS = f"""
     padding: 14px;
     box-shadow: {SHADOW_SM};
   }}
+
+  /* ── Sidebar refresh buttons (API / Masters / Sent) ───────────────── */
+  section[data-testid="stSidebar"] [data-testid="stButton"] button {{
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 8px;
+    border: 1px solid {BORDER};
+    background: {SURFACE};
+    color: {NAVY};
+    transition: background .15s ease, border-color .15s ease, color .15s ease;
+  }}
+  section[data-testid="stSidebar"] [data-testid="stButton"] button:hover {{
+    background: {PALE_BLUE};
+    border-color: {BLUE};
+    color: {BLUE};
+  }}
 </style>
 """
 

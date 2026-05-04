@@ -140,13 +140,13 @@ def render_refresh_section(last_visit):
     )
 
     rb1, rb2, rb3 = st.columns(3)
-    if rb1.button("🔁 API", use_container_width=True,
+    if rb1.button("API", use_container_width=True,
                   help="Re-download inventory/delivery/visits from Retex (~1-2 min)"):
         _run_script(["RouteToDelivery.py"], "API", publish=auto_publish)
-    if rb2.button("📋 Masters", use_container_width=True,
+    if rb2.button("Masters", use_container_width=True,
                   help="Re-download Route Master from SharePoint"):
         _run_script(["extract.py", "--route-master"], "Route Master", publish=auto_publish)
-    if rb3.button("📦 Sent", use_container_width=True,
+    if rb3.button("Sent", use_container_width=True,
                   help="Re-download deliveries from on-prem SQL and run Transform.py"):
         _run_chain([
             (["extract.py", "--deliveries"], "Deliveries SQL"),
