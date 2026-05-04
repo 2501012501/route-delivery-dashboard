@@ -245,16 +245,14 @@ def render_refresh_section(last_visit, *, vis=None):
         # Show any non-error publish status (success / info) that survived the rerun
         render_publish_status()
 
-        # Detailed freshness lines (in business timezone)
+        # Single freshness line: when the newest record in the data was created
+        # (max Visit_DateTime). This is what 'how fresh is the data' really means
+        # and it's the same value on local and on Cloud.
         if epoch_data is not None:
             ts = (pd.Timestamp(epoch_data, unit='s', tz='UTC')
                     .tz_convert(BUSINESS_TZ)
                     .tz_localize(None))
             st.caption(f"Data updated: **{ts.strftime('%Y-%m-%d %H:%M')}** · _{_format_ago(epoch_data)}_")
-
-        if epoch_file is not None and not is_cloud():
-            last_refresh = _last_data_refresh()
-            st.caption(f"Last local refresh: _{last_refresh.strftime('%Y-%m-%d %H:%M')}_")
 
         if is_cloud():
             st.caption("🌐 **Read-only view** — refresh disabled in cloud. "
