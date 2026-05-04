@@ -8,7 +8,11 @@ de inventario por tienda.
 
 ```
 Route to delivery/
-├── dashboard.py              ← App Streamlit principal
+├── Home.py                   ← App Streamlit principal (entry)
+├── pages/                    ← Páginas (Daily Follow, Sent vs Delivery, Errors, 7-Day)
+├── lib/                      ← Módulos compartidos (data, filters, refresh, theme)
+├── .streamlit/config.toml    ← Tema McKinsey blue
+├── dashboard.py              ← Stub legacy → redirige a Home.py
 ├── RouteToDelivery.py        ← Baja inventory/delivery/visits de Retex API
 ├── extract.py                ← Baja masters de SharePoint y SQL on-prem
 ├── Transform.py              ← Procesa raw SQL → parquets finales
@@ -44,7 +48,7 @@ Route to delivery/
 ## Cómo correr
 
 ```powershell
-python -m streamlit run dashboard.py
+python -m streamlit run Home.py
 ```
 
 Se abre en `http://localhost:8501`. `Ctrl+C` para detener.
@@ -75,11 +79,26 @@ python extract.py --deliveries && python Transform.py   # SQL on-prem
 - **Activity Type** — Driver Merchandiser Visit / Supervisor Visit
 - **Solo rutas programadas** — usa Service Days del route master
 
-## Tabs
+## Páginas
 
-- **📅 Follow del Día** — cumplimiento por cluster y por ruta. Detalle por
-  ruta con tiendas color-coded (🟢 visitada · 🟡 en proceso · 🔴 pendiente).
-- **📦 Enviado vs Entregado** — compara DELIVERY UNITS (warehouse) vs
+Las páginas viven en `pages/` y se ven en el sidebar:
+
+- **Daily Follow** — cumplimiento de visitas del día por cluster y por ruta.
+  Detalle por ruta con tiendas marcadas como Visited / In progress / Pending.
+- **Sent vs Delivery** — compara DELIVERY UNITS (warehouse) vs
   DeliveredBunches (driver) por ruta.
-- **⚠️ Errores** — diferencias de inventario:
+- **Errors** — diferencias de inventario:
   `Initial + Delivery − Credits − Final ≠ 0`.
+- **7-Day Summary** — vista ejecutiva: tendencia de cumplimiento, sent vs
+  delivered, top tiendas con más errores en los últimos 7 días.
+
+### Lógica de inclusión de rutas
+
+Por defecto la dashboard muestra:
+- Rutas **programadas** para el día (Service Days) — aunque no hayan sido
+  visitadas (aparecen como Pending).
+- Más rutas con **actividad** (visitas / deliveries) ese día — aunque no
+  estén programadas (caso de cambio de horario).
+
+El checkbox **"Show all routes"** del sidebar permite ver todas las rutas
+del route master sin filtrar.
