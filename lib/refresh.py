@@ -27,17 +27,47 @@ _DATA_PATHS = [
 ]
 
 
-def _last_data_refresh_epoch():
-    """Newest mtime across data files as epoch seconds (timezone-independent)."""
+def _file_mtime_epoch():
+    """Newest filesystem mtime across data files. On Cloud this reflects the
+    last deploy, not the data content — use _data_freshness_epoch() instead
+    for an indicator that's consistent between local and Cloud.
+    """
     mtimes = [p.stat().st_mtime for p in _DATA_PATHS if p.exists()]
     return max(mtimes) if mtimes else None
 
 
-def _last_data_refresh():
-    """Newest mtime across the parquet data files, as a naive pd.Timestamp
-    in BUSINESS_TZ (so it shows the same hour on local and on Cloud).
+def _data_freshness_epoch(*, vis=None) -> float | None:
+    """Newest record timestamp inside the loaded data, as epoch seconds.
+    This is the same value on local and Cloud since both read the same
+    parquets — so the freshness indicator agrees in both views.
     """
-    epoch = _last_data_refresh_epoch()
+    if vis is None or vis.empty or 'Visit_DateTime' not in vis.columns:
+        return _file_mtime_epoch()
+    m = vis['Visit_DateTime'].max()
+    if pd.isna(m):
+        return _file_mtime_epoch()
+    # Visit_DateTime is naive UTC (parsed with utc=True then tz_localize(None))
+    return m.tz_localize('UTC').timestamp()
+
+
+# Back-compat aliases
+_last_data_refresh_epoch = _file_mtime_epoch
+
+
+def _last_data_refresh():
+    """File mtime as naive pd.Timestamp in BUSINESS_TZ — kept for the local
+    'when did I last click refresh' caption."""
+    epoch = _file_mtime_epoch()
+    if epoch is None:
+        return None
+    return (pd.Timestamp(epoch, unit='s', tz='UTC')
+              .tz_convert(BUSINESS_TZ)
+              .tz_localize(None))
+
+
+def _data_freshness_ts(*, vis=None):
+    """Latest in-data timestamp as a naive pd.Timestamp in BUSINESS_TZ."""
+    epoch = _data_freshness_epoch(vis=vis)
     if epoch is None:
         return None
     return (pd.Timestamp(epoch, unit='s', tz='UTC')
@@ -142,23 +172,32 @@ def _run_chain(steps, publish=False):
     st.rerun()
 
 
-def render_refresh_section(last_visit):
+def render_refresh_section(last_visit, *, vis=None):
     """Render the data section of the sidebar: freshness + refresh buttons + share link.
 
-    `last_visit` is a Timestamp (or NaT) — passed in so we don't re-import data here.
-    Hidden on cloud (read-only banner only).
+    `last_visit` is a Timestamp (or NaT) for the legacy 'Last visit in data' line.
+    `vis` is the visits dataframe — used to compute the data-content freshness
+    indicator that's consistent between local and Cloud.
+
+    Hidden on cloud (read-only banner only) for the refresh + auto-publish
+    controls; the freshness lines remain visible.
     """
     st.header("📡 Data")
-    epoch = _last_data_refresh_epoch()
-    if epoch is not None:
+
+    # Data-content freshness — same on local and Cloud since both read the same parquet
+    epoch_data = _data_freshness_epoch(vis=vis)
+    if epoch_data is not None:
+        ts = (pd.Timestamp(epoch_data, unit='s', tz='UTC')
+                .tz_convert(BUSINESS_TZ)
+                .tz_localize(None))
+        st.caption(f"Data updated: **{ts.strftime('%Y-%m-%d %H:%M')}** · _{_format_ago(epoch_data)}_")
+
+    # File mtime — the actual moment the parquet was written. On local that's
+    # 'when did I last click refresh'; on Cloud it's 'when did the deploy run'.
+    epoch_file = _file_mtime_epoch()
+    if epoch_file is not None and not is_cloud():
         last_refresh = _last_data_refresh()
-        ago = _format_ago(epoch)
-        st.caption(f"Last refresh: **{last_refresh.strftime('%Y-%m-%d %H:%M')}** · _{ago}_")
-    if pd.notna(last_visit):
-        last_visit_biz = _to_business_tz(last_visit)
-        st.caption(f"Last visit in data: **{last_visit_biz.strftime('%Y-%m-%d %H:%M')}**")
-    else:
-        st.caption("No visits recorded yet")
+        st.caption(f"Last local refresh: _{last_refresh.strftime('%Y-%m-%d %H:%M')}_")
 
     if is_cloud():
         st.caption("🌐 **Read-only view** — refresh disabled in cloud. "

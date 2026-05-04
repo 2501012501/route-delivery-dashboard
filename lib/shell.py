@@ -11,15 +11,16 @@ import streamlit as st
 
 from lib.data import load_data
 from lib.filters import render_sidebar_filters
-from lib.refresh import (_format_ago, _last_data_refresh_epoch,
+from lib.refresh import (_data_freshness_epoch, _format_ago,
                           render_refresh_section)
 from lib.routes import annotate_service_days, detect_route_columns
 from lib.theme import inject_css, top_header
 
 
-def _format_freshness() -> str | None:
-    """Returns 'Data updated N min ago' or None — timezone-safe."""
-    epoch = _last_data_refresh_epoch()
+def _format_freshness(vis=None) -> str | None:
+    """Returns 'Data updated N min ago' computed from the newest record
+    inside the loaded data — same value on local and Cloud."""
+    epoch = _data_freshness_epoch(vis=vis)
     if epoch is None:
         return None
     return f"Data updated {_format_ago(epoch)}"
@@ -32,9 +33,10 @@ def setup():
     Renders the persistent top header (brand + freshness pill).
     """
     inject_css()
-    top_header(_format_freshness())
 
     inv, dlv, vis, sm, rm, rm_error, sent = load_data()
+    # Compute freshness from data content (same on local + Cloud) before rendering header
+    top_header(_format_freshness(vis=vis))
 
     if rm is None:
         st.error(
@@ -56,7 +58,7 @@ def setup():
 
     with st.sidebar:
         last_visit = vis['Visit_DateTime'].max() if not vis.empty else None
-        render_refresh_section(last_visit)
+        render_refresh_section(last_visit, vis=vis)
         st.divider()
         filters = render_sidebar_filters(
             sm=sm, vis=vis, inv=inv, dlv=dlv, rm=rm, route_cols=route_cols,

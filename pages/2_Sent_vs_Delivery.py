@@ -139,18 +139,46 @@ else:
     if f['store_filter'] != '(All)':
         store_comp = store_comp[store_comp['Store_Number'] == f['store_filter']]
 
+    def _store_status(row):
+        """Traffic-light status for a per-store row.
+        🟢 = delivered ≥ sent (full)         compliance ≥ 100%
+        🟡 = partial delivery                  60% ≤ compliance < 100%
+        🔴 = below 60% delivered               compliance < 60%
+        ⚪ = no sent units recorded            sent = 0
+        """
+        if row['Sent'] == 0:
+            return '⚪ No sent'
+        pct = row['Compliance']
+        if pct >= 100:
+            return '🟢 Full'
+        if pct >= 60:
+            return '🟡 Partial'
+        return '🔴 Short'
+
+    store_comp['Status'] = store_comp.apply(_store_status, axis=1)
+
     store_show = store_comp[
-        ['Store_Number', 'Route No.', 'CLUSTER FULL', 'CUSTOMER', 'Sent', 'Delivered', 'Diff', 'Compliance']
+        ['Status', 'Store_Number', 'Route No.', 'CLUSTER FULL', 'CUSTOMER',
+         'Sent', 'Delivered', 'Diff', 'Compliance']
     ].sort_values('Diff', key=lambda x: x.abs(), ascending=False)
 
     panel_open("Per store")
     if store_show.empty:
         st.caption("No stores match the current filters.")
     else:
-        st.caption(f"{len(store_show):,} stores · sorted by largest variance first")
+        # Counts for the legend
+        n_full    = int((store_comp['Status'] == '🟢 Full').sum())
+        n_partial = int((store_comp['Status'] == '🟡 Partial').sum())
+        n_short   = int((store_comp['Status'] == '🔴 Short').sum())
+        n_no_sent = int((store_comp['Status'] == '⚪ No sent').sum())
+        st.caption(
+            f"🟢 Full: **{n_full:,}**  ·  🟡 Partial: **{n_partial:,}**  ·  "
+            f"🔴 Short: **{n_short:,}**  ·  ⚪ No sent: **{n_no_sent:,}**"
+        )
         st.dataframe(
             store_show, use_container_width=True, hide_index=True,
             column_config={
+                "Status":    st.column_config.TextColumn("Status", width="small"),
                 "Compliance": st.column_config.ProgressColumn(
                     "Compliance", format="%.0f%%", min_value=0, max_value=100
                 ),

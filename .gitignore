@@ -35,6 +35,7 @@ data/deliveries_raw.parquet
 
 # Logs
 *.log
+logs/
 
 # Brainstorming visual companion (mockups + state)
 .superpowers/
