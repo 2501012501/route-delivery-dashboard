@@ -173,38 +173,42 @@ def _run_chain(steps, publish=False):
 
 
 def render_refresh_section(last_visit, *, vis=None):
-    """Render the data section of the sidebar: freshness + refresh buttons + share link.
+    """Render the entire Data section as a SINGLE collapsible row in the sidebar.
 
-    `last_visit` is a Timestamp (or NaT) for the legacy 'Last visit in data' line.
+    Collapsed label: '📡 Data · Updated N min ago'
+    Expanded body:   data timestamps + refresh controls + public link.
+
     `vis` is the visits dataframe — used to compute the data-content freshness
     indicator that's consistent between local and Cloud.
-
-    Hidden on cloud (read-only banner only) for the refresh + auto-publish
-    controls; the freshness lines remain visible.
     """
-    st.header("📡 Data")
-
-    # Data-content freshness — same on local and Cloud since both read the same parquet
     epoch_data = _data_freshness_epoch(vis=vis)
-    if epoch_data is not None:
-        ts = (pd.Timestamp(epoch_data, unit='s', tz='UTC')
-                .tz_convert(BUSINESS_TZ)
-                .tz_localize(None))
-        st.caption(f"Data updated: **{ts.strftime('%Y-%m-%d %H:%M')}** · _{_format_ago(epoch_data)}_")
-
-    # File mtime — the actual moment the parquet was written. On local that's
-    # 'when did I last click refresh'; on Cloud it's 'when did the deploy run'.
     epoch_file = _file_mtime_epoch()
-    if epoch_file is not None and not is_cloud():
-        last_refresh = _last_data_refresh()
-        st.caption(f"Last local refresh: _{last_refresh.strftime('%Y-%m-%d %H:%M')}_")
 
-    if is_cloud():
-        st.caption("🌐 **Read-only view** — refresh disabled in cloud. "
-                   "Data updated when the owner pushes new files.")
-        return
+    if epoch_data is not None:
+        label = f"📡 Data · Updated {_format_ago(epoch_data)}"
+    else:
+        label = "📡 Data"
 
-    with st.expander("Refresh data", expanded=False):
+    with st.expander(label, expanded=False):
+        # Detailed freshness lines (in business timezone)
+        if epoch_data is not None:
+            ts = (pd.Timestamp(epoch_data, unit='s', tz='UTC')
+                    .tz_convert(BUSINESS_TZ)
+                    .tz_localize(None))
+            st.caption(f"Data updated: **{ts.strftime('%Y-%m-%d %H:%M')}** · _{_format_ago(epoch_data)}_")
+
+        if epoch_file is not None and not is_cloud():
+            last_refresh = _last_data_refresh()
+            st.caption(f"Last local refresh: _{last_refresh.strftime('%Y-%m-%d %H:%M')}_")
+
+        if is_cloud():
+            st.caption("🌐 **Read-only view** — refresh disabled in cloud. "
+                       "Data updated when the owner pushes new files.")
+            st.caption("Public link:")
+            st.code(PUBLIC_URL, language=None)
+            return
+
+        st.markdown("**Refresh data**")
         auto_publish = st.checkbox(
             "☁️ Auto-publish to cloud after refresh", value=True,
             help="After refreshing, push data to GitHub so the Streamlit Cloud "
@@ -225,10 +229,6 @@ def render_refresh_section(last_visit, *, vis=None):
                 (["Transform.py"],               "Transform"),
             ], publish=auto_publish)
 
-    with st.expander("🌐 Public link"):
+        st.markdown("**🌐 Public link**")
         st.caption("Send this link to your team — works from any browser, no VPN needed:")
         st.code(PUBLIC_URL, language=None)
-        st.caption(
-            "ℹ️ The cloud version updates automatically when Auto-publish is on "
-            "and you click any of the refresh buttons above."
-        )
