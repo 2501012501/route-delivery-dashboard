@@ -37,5 +37,8 @@ data/deliveries_raw.parquet
 *.log
 logs/
 
+# RouteToDelivery dimension cache (.cache/dims/*.parquet)
+.cache/
+
 # Brainstorming visual companion (mockups + state)
 .superpowers/
