@@ -37,28 +37,18 @@ _CSS = f"""
     background: {PAGE_BG};
   }}
 
-  /* Slim Streamlit's default header (hide its toolbar) but keep it
-     present so the sidebar collapse / expand controls inside it remain
-     reachable across versions. */
+  /* Streamlit's default header — keep it present (the sidebar expand
+     button lives there) but make it transparent and slim. Only hide
+     specific toolbar items, NOT the entire toolbar. */
   header[data-testid="stHeader"] {{
     background: transparent;
   }}
-  header[data-testid="stHeader"] [data-testid="stToolbar"] {{
+  /* Hide the kebab menu and "Deploy" button, but leave everything else
+     in the toolbar reachable (the sidebar expand button is in there). */
+  header[data-testid="stHeader"] [data-testid="stMainMenu"],
+  header[data-testid="stHeader"] [data-testid="stDecoration"],
+  header[data-testid="stHeader"] [data-testid="stStatusWidget"] {{
     display: none;
-  }}
-
-  /* When the sidebar is collapsed, force the expand button to be
-     visible top-left so the user can always bring the sidebar back.
-     Cover every selector Streamlit has used across versions. */
-  [data-testid="stSidebarCollapsedControl"],
-  [data-testid="collapsedControl"],
-  [data-testid="stExpandSidebarButton"],
-  [aria-label="Open sidebar"],
-  [aria-label="open sidebar"] {{
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    z-index: 9999 !important;
   }}
 
   /* Constrain content width so it reads like a real webapp */
@@ -419,9 +409,48 @@ _CSS = f"""
 """
 
 
+_SIDEBAR_EXPAND_FIX_JS = """
+<script>
+(function() {
+  // Streamlit hides the sidebar expand button via inline styles after
+  // collapse on some versions. Force-show it from the parent context
+  // every 400ms so the user can always reopen the sidebar.
+  function ensureExpandVisible() {
+    try {
+      const doc = window.parent ? window.parent.document : document;
+      const selectors = [
+        '[data-testid="stSidebarCollapsedControl"]',
+        '[data-testid="collapsedControl"]',
+        '[data-testid="stExpandSidebarButton"]',
+        '[data-testid="stSidebarCollapseButton"]',
+        '[aria-label="Open sidebar"]',
+        '[aria-label="open sidebar"]',
+        'button[kind="header"]',
+        'button[kind="headerNoPadding"]'
+      ];
+      doc.querySelectorAll(selectors.join(',')).forEach(el => {
+        el.style.setProperty('display', 'flex', 'important');
+        el.style.setProperty('visibility', 'visible', 'important');
+        el.style.setProperty('opacity', '1', 'important');
+        el.style.setProperty('z-index', '9999', 'important');
+      });
+    } catch (e) { /* cross-origin guard */ }
+  }
+  setInterval(ensureExpandVisible, 400);
+  ensureExpandVisible();
+})();
+</script>
+"""
+
+
 def inject_css():
-    """Call once at the top of every page (Home + pages/*) to apply the theme."""
+    """Call once at the top of every page (Home + pages/*) to apply the theme.
+    Also injects a tiny JS helper that keeps the sidebar expand button
+    visible after collapse (works around a Streamlit 1.57+ rendering bug).
+    """
     st.markdown(_CSS, unsafe_allow_html=True)
+    # The script runs in an invisible iframe but reaches into window.parent.
+    st.components.v1.html(_SIDEBAR_EXPAND_FIX_JS, height=0)
 
 
 def top_header(fresh_text: str | None = None):
