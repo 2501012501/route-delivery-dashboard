@@ -36,37 +36,27 @@ _CSS = f"""
     background: {PAGE_BG};
   }}
 
-  /* Keep Streamlit's header visible so the sidebar expand arrow stays
-     reachable. We just slim it down and hide the toolbar (Stop, kebab). */
+  /* Hide Streamlit's default top header for a cleaner webapp feel. The
+     sidebar is locked open below, so we don't need its collapse controls. */
   header[data-testid="stHeader"] {{
-    background: transparent;
-  }}
-  header[data-testid="stHeader"] [data-testid="stToolbar"] {{
     display: none;
   }}
 
-  /* Belt-and-suspenders: cover every selector Streamlit has used for the
-     sidebar-expand button across versions (incl. 1.57+ on Cloud). */
+  /* SIDEBAR LOCKED OPEN — no way for the user to collapse it. This avoids
+     a long-standing Streamlit bug where the expand arrow disappears
+     after collapse. Hide every collapse / expand control selector. */
   [data-testid="stSidebarCollapsedControl"],
   [data-testid="collapsedControl"],
   [data-testid="stSidebarCollapseButton"],
+  [data-testid="stSidebarCloseButton"],
   [data-testid="stExpandSidebarButton"],
   [aria-label="Open sidebar"],
+  [aria-label="Close sidebar"],
   [aria-label="open sidebar"],
+  [aria-label="close sidebar"],
   button[kind="header"],
   button[kind="headerNoPadding"] {{
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    position: fixed !important;
-    top: 10px !important;
-    left: 10px !important;
-    z-index: 9999 !important;
-    background: rgba(255, 255, 255, 0.95) !important;
-    border: 1px solid {BORDER} !important;
-    border-radius: 8px !important;
-    padding: 6px !important;
-    box-shadow: {SHADOW_SM} !important;
+    display: none !important;
   }}
 
   /* Constrain content width so it reads like a real webapp */
@@ -149,10 +139,17 @@ _CSS = f"""
   }}
 
   /* ── Sidebar polish ───────────────────────────────────────────────── */
+  /* Locked-open: width fixed, can't be collapsed (collapse buttons hidden
+     above). Soft blue tint differentiates the navigation column from the
+     content area. */
   section[data-testid="stSidebar"] {{
-    background: {SURFACE};
+    background: {PALE_BLUE} !important;
     border-right: 1px solid {BORDER};
     box-shadow: {SHADOW_SM};
+    min-width: 244px !important;
+    max-width: 244px !important;
+    transform: none !important;
+    visibility: visible !important;
   }}
 
   /* ── Sidebar nav (page menu at the top) ───────────────────────────── */
