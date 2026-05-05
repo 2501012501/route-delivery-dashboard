@@ -140,11 +140,9 @@ _CSS = f"""
   }}
 
   /* ── Sidebar polish ───────────────────────────────────────────────── */
-  /* Locked-open: width fixed, can't be collapsed (collapse buttons hidden
-     above). Soft blue tint differentiates the navigation column from the
-     content area. The override has to win against Streamlit's inline
-     transform/width that triggers when collapsed state is stored in
-     localStorage from a previous session. */
+  /* Always visible (no full-collapse — that triggers a Streamlit bug
+     where the expand arrow disappears), but the user can drag the right
+     edge to make it wider/narrower within a sane range. */
   section[data-testid="stSidebar"],
   section[data-testid="stSidebar"][aria-expanded="false"],
   section[data-testid="stSidebar"][aria-expanded="true"],
@@ -153,19 +151,27 @@ _CSS = f"""
     background: {SIDEBAR_BG} !important;
     border-right: 1px solid {BORDER};
     box-shadow: {SHADOW_SM};
-    min-width: 244px !important;
-    max-width: 244px !important;
-    width: 244px !important;
+    min-width: 200px !important;
+    max-width: 480px !important;
     transform: translateX(0) !important;
     visibility: visible !important;
     display: block !important;
     margin-left: 0 !important;
     left: 0 !important;
   }}
-  /* Hide the drag-to-resize handle since width is fixed */
+  /* Make the drag handle visible and easy to grab */
   [data-testid="stSidebarResizer"],
   [data-testid="stSidebarResizeHandle"] {{
-    display: none !important;
+    display: block !important;
+    width: 6px !important;
+    background: transparent;
+    cursor: ew-resize;
+    transition: background .15s ease;
+  }}
+  [data-testid="stSidebarResizer"]:hover,
+  [data-testid="stSidebarResizeHandle"]:hover {{
+    background: {BLUE};
+    opacity: 0.4;
   }}
 
   /* ── Sidebar nav (page menu at the top) ───────────────────────────── */
