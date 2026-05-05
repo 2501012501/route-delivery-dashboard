@@ -37,27 +37,28 @@ _CSS = f"""
     background: {PAGE_BG};
   }}
 
-  /* Hide Streamlit's default top header for a cleaner webapp feel. The
-     sidebar is locked open below, so we don't need its collapse controls. */
+  /* Slim Streamlit's default header (hide its toolbar) but keep it
+     present so the sidebar collapse / expand controls inside it remain
+     reachable across versions. */
   header[data-testid="stHeader"] {{
+    background: transparent;
+  }}
+  header[data-testid="stHeader"] [data-testid="stToolbar"] {{
     display: none;
   }}
 
-  /* SIDEBAR LOCKED OPEN — no way for the user to collapse it. This avoids
-     a long-standing Streamlit bug where the expand arrow disappears
-     after collapse. Hide every collapse / expand control selector. */
+  /* When the sidebar is collapsed, force the expand button to be
+     visible top-left so the user can always bring the sidebar back.
+     Cover every selector Streamlit has used across versions. */
   [data-testid="stSidebarCollapsedControl"],
   [data-testid="collapsedControl"],
-  [data-testid="stSidebarCollapseButton"],
-  [data-testid="stSidebarCloseButton"],
   [data-testid="stExpandSidebarButton"],
   [aria-label="Open sidebar"],
-  [aria-label="Close sidebar"],
-  [aria-label="open sidebar"],
-  [aria-label="close sidebar"],
-  button[kind="header"],
-  button[kind="headerNoPadding"] {{
-    display: none !important;
+  [aria-label="open sidebar"] {{
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 9999 !important;
   }}
 
   /* Constrain content width so it reads like a real webapp */
@@ -140,29 +141,18 @@ _CSS = f"""
   }}
 
   /* ── Sidebar polish ───────────────────────────────────────────────── */
-  /* Always visible (no full-collapse — that triggers a Streamlit bug
-     where the expand arrow disappears), but the user can drag the right
-     edge to make it wider/narrower within a sane range. */
-  section[data-testid="stSidebar"],
-  section[data-testid="stSidebar"][aria-expanded="false"],
-  section[data-testid="stSidebar"][aria-expanded="true"],
-  div[data-testid="stSidebar"],
-  [data-testid="stSidebar"] {{
-    background: {SIDEBAR_BG} !important;
+  /* Just the cosmetic bits: tinted background + subtle border. No width
+     constraints, no transform overrides — let Streamlit handle resize
+     and collapse / expand with its native controls. */
+  section[data-testid="stSidebar"] {{
+    background: {SIDEBAR_BG};
     border-right: 1px solid {BORDER};
     box-shadow: {SHADOW_SM};
-    min-width: 200px !important;
-    max-width: 480px !important;
-    transform: translateX(0) !important;
-    visibility: visible !important;
-    display: block !important;
-    margin-left: 0 !important;
-    left: 0 !important;
   }}
-  /* Make the drag handle visible and easy to grab */
+  /* Make the drag-to-resize handle on the right edge easy to grab and
+     hint at it on hover with a blue tint. */
   [data-testid="stSidebarResizer"],
   [data-testid="stSidebarResizeHandle"] {{
-    display: block !important;
     width: 6px !important;
     background: transparent;
     cursor: ew-resize;
