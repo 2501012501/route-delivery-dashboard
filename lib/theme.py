@@ -45,11 +45,16 @@ _CSS = f"""
     display: none;
   }}
 
-  /* Belt-and-suspenders: make sure the sidebar-expand button is always
-     visible in case Streamlit's positioning changes between versions. */
+  /* Belt-and-suspenders: cover every selector Streamlit has used for the
+     sidebar-expand button across versions (incl. 1.57+ on Cloud). */
   [data-testid="stSidebarCollapsedControl"],
   [data-testid="collapsedControl"],
-  button[kind="header"] {{
+  [data-testid="stSidebarCollapseButton"],
+  [data-testid="stExpandSidebarButton"],
+  [aria-label="Open sidebar"],
+  [aria-label="open sidebar"],
+  button[kind="header"],
+  button[kind="headerNoPadding"] {{
     display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
@@ -57,6 +62,11 @@ _CSS = f"""
     top: 10px !important;
     left: 10px !important;
     z-index: 9999 !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid {BORDER} !important;
+    border-radius: 8px !important;
+    padding: 6px !important;
+    box-shadow: {SHADOW_SM} !important;
   }}
 
   /* Constrain content width so it reads like a real webapp */
