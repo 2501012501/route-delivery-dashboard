@@ -37,18 +37,27 @@ _CSS = f"""
     background: {PAGE_BG};
   }}
 
-  /* Streamlit's default header — keep it present (the sidebar expand
-     button lives there) but make it transparent and slim. Only hide
-     specific toolbar items, NOT the entire toolbar. */
+  /* Hide Streamlit's default header for a cleaner webapp feel.
+     Sidebar collapse is disabled below, so we don't need its controls. */
   header[data-testid="stHeader"] {{
-    background: transparent;
-  }}
-  /* Hide the kebab menu and "Deploy" button, but leave everything else
-     in the toolbar reachable (the sidebar expand button is in there). */
-  header[data-testid="stHeader"] [data-testid="stMainMenu"],
-  header[data-testid="stHeader"] [data-testid="stDecoration"],
-  header[data-testid="stHeader"] [data-testid="stStatusWidget"] {{
     display: none;
+  }}
+
+  /* Sidebar is locked open (no full collapse), because Streamlit 1.57+
+     has a bug where the expand button doesn't render after a collapse.
+     User can still drag the right edge to resize within a sane range. */
+  [data-testid="stSidebarCollapseButton"],
+  [data-testid="stSidebarCloseButton"],
+  button[data-testid="stSidebarHeaderButton"],
+  [aria-label="Close sidebar"],
+  [aria-label="close sidebar"] {{
+    display: none !important;
+  }}
+  /* Force the sidebar visible regardless of collapsed state in storage */
+  section[data-testid="stSidebar"] {{
+    transform: translateX(0) !important;
+    visibility: visible !important;
+    min-width: 220px !important;
   }}
 
   /* Constrain content width so it reads like a real webapp */
