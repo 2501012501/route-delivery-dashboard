@@ -418,48 +418,79 @@ _CSS = f"""
 """
 
 
-_SIDEBAR_EXPAND_FIX_JS = """
+_SIDEBAR_TOGGLE_JS = f"""
 <script>
-(function() {
-  // Streamlit hides the sidebar expand button via inline styles after
-  // collapse on some versions. Force-show it from the parent context
-  // every 400ms so the user can always reopen the sidebar.
-  function ensureExpandVisible() {
-    try {
-      const doc = window.parent ? window.parent.document : document;
-      const selectors = [
-        '[data-testid="stSidebarCollapsedControl"]',
-        '[data-testid="collapsedControl"]',
-        '[data-testid="stExpandSidebarButton"]',
-        '[data-testid="stSidebarCollapseButton"]',
-        '[aria-label="Open sidebar"]',
-        '[aria-label="open sidebar"]',
-        'button[kind="header"]',
-        'button[kind="headerNoPadding"]'
-      ];
-      doc.querySelectorAll(selectors.join(',')).forEach(el => {
-        el.style.setProperty('display', 'flex', 'important');
-        el.style.setProperty('visibility', 'visible', 'important');
-        el.style.setProperty('opacity', '1', 'important');
-        el.style.setProperty('z-index', '9999', 'important');
-      });
-    } catch (e) { /* cross-origin guard */ }
-  }
-  setInterval(ensureExpandVisible, 400);
-  ensureExpandVisible();
-})();
+(function() {{
+  // Streamlit's native collapse + expand is broken on 1.57+ (the expand
+  // arrow doesn't render after collapse). Replace it with a custom
+  // top-left toggle button that's always visible.
+  const parentDoc = window.parent ? window.parent.document : document;
+  if (parentDoc.getElementById('rtd-sidebar-toggle')) return;  // idempotent
+
+  // Inject CSS into parent doc that hides the sidebar when body has a class
+  const style = parentDoc.createElement('style');
+  style.textContent = `
+    body.rtd-sidebar-hidden section[data-testid="stSidebar"] {{
+      display: none !important;
+    }}
+    body.rtd-sidebar-hidden [data-testid="stAppViewContainer"] > section:not([data-testid="stSidebar"]) {{
+      margin-left: 0 !important;
+      max-width: 100% !important;
+    }}
+    #rtd-sidebar-toggle {{
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 99999;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: {SURFACE};
+      color: {NAVY};
+      border: 1px solid {BORDER};
+      border-radius: 8px;
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: {SHADOW_SM};
+      transition: background .15s ease, border-color .15s ease, color .15s ease;
+      user-select: none;
+    }}
+    #rtd-sidebar-toggle:hover {{
+      background: {PALE_BLUE};
+      border-color: {BLUE};
+      color: {BLUE};
+    }}
+  `;
+  parentDoc.head.appendChild(style);
+
+  // Create the toggle button itself
+  const btn = parentDoc.createElement('button');
+  btn.id = 'rtd-sidebar-toggle';
+  btn.innerHTML = '☰';
+  btn.title = 'Toggle sidebar';
+  btn.setAttribute('aria-label', 'Toggle sidebar');
+  btn.onclick = () => {{
+    parentDoc.body.classList.toggle('rtd-sidebar-hidden');
+  }};
+  parentDoc.body.appendChild(btn);
+}})();
 </script>
 """
 
 
 def inject_css():
     """Call once at the top of every page (Home + pages/*) to apply the theme.
-    Also injects a tiny JS helper that keeps the sidebar expand button
-    visible after collapse (works around a Streamlit 1.57+ rendering bug).
+    Also injects a custom sidebar toggle button (Streamlit's native collapse
+    is broken in 1.57+ — the expand arrow doesn't reappear after collapse).
     """
     st.markdown(_CSS, unsafe_allow_html=True)
-    # The script runs in an invisible iframe but reaches into window.parent.
-    st.components.v1.html(_SIDEBAR_EXPAND_FIX_JS, height=0)
+    # Renders in an invisible iframe but reaches into the parent doc to
+    # inject the toggle button + CSS for the hide-sidebar class.
+    st.components.v1.html(_SIDEBAR_TOGGLE_JS, height=0)
 
 
 def top_header(fresh_text: str | None = None):
