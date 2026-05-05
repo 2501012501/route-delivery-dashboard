@@ -220,6 +220,11 @@ def _slide_window(parquet_path: str, new_df: pd.DataFrame, *,
 
 
 # ── Dimensiones (parallel + cached) ───────────────────────────────────────────
+# NOTE: actdef (DActivityDefinition) is intentionally NOT in this list. Its
+# First_Realization_Date / _Time columns change throughout the day as drivers
+# complete visits, so caching it for hours means missing today's data. It is
+# fetched separately in load_actdef() with a date filter (~9 sec instead of
+# ~5 min for the full 2M-row pull).
 _DIM_SPECS = [
     ('cust',    f"{BASE}/BaseDimensions/DCustomer",
      ['CUS_ID', 'Customer_Name', 'Customer_Name2']),
@@ -233,11 +238,6 @@ _DIM_SPECS = [
      ['USR_ST_ID', 'USR_ID']),
     ('mdef',    f"{BASE}/MonitoringDomain/DMonitoringDefinition",
      ['MTD_MTDR_ID', 'Monitoring_Name']),
-    ('actdef',  f"{BASE}/ActivityDomain/DActivityDefinition",
-     ['APP_ID', 'Activity_Type',
-      'Planned_duration', 'Actual_duration',
-      'First_Realization_Date', 'First_Realization_Time',
-      'Last_Realization_Date',  'Last_Realization_Time']),
 ]
 
 
@@ -247,7 +247,10 @@ def _fetch_one_dim(name, url, columns):
 
 
 def load_dims():
-    """Fetch all 7 dimension tables in parallel, using on-disk cache when fresh."""
+    """Fetch the 6 stable dimension tables in parallel, using the 24h on-disk
+    cache. actdef is fetched separately by load_actdef() — see the note above
+    _DIM_SPECS for why.
+    """
     results = {}
     with ThreadPoolExecutor(max_workers=DIM_WORKERS) as pool:
         futures = [pool.submit(_fetch_one_dim, *spec) for spec in _DIM_SPECS]
@@ -256,8 +259,29 @@ def load_dims():
             results[name] = df
     return (
         results['cust'], results['cust_st'], results['prod'],
-        results['user'], results['user_st'], results['mdef'], results['actdef'],
+        results['user'], results['user_st'], results['mdef'],
     )
+
+
+def load_actdef(*, since=None):
+    """Fetch DActivityDefinition rows realized in the last `DAYS` days.
+
+    Pulled fresh on every run because First_Realization_Date / _Time update
+    throughout the day as drivers complete visits — caching even briefly
+    causes the dashboard to miss today's activity. The date filter keeps the
+    payload small (~17k rows / ~9 sec instead of 1.9M rows / ~5 min).
+    """
+    if since is None:
+        since = _now_utc_naive() - timedelta(days=DAYS)
+    cutoff = since.strftime("%Y-%m-%d")
+    flt = f"First_Realization_Date ge {cutoff}"
+    print(f"  [actdef] Filter: {flt}")
+    url = f"{BASE}/ActivityDomain/DActivityDefinition?$filter={flt}"
+    df = fetch_all(url, sess=_new_session(), label="actdef")
+    cols = ['APP_ID', 'Activity_Type', 'Planned_duration', 'Actual_duration',
+            'First_Realization_Date', 'First_Realization_Time',
+            'Last_Realization_Date',  'Last_Realization_Time']
+    return df[[c for c in cols if c in df.columns]] if not df.empty else df
 
 
 def _retailer_mask(series):
@@ -377,7 +401,10 @@ def main():
     store_master.to_csv(f"{OUT_DIR}/store_master.csv", index=False)
 
     print("\nLoading dimensions from Retex API (parallel + cached)...")
-    cust, cust_st, prod, user, user_st, mdef, actdef = load_dims()
+    cust, cust_st, prod, user, user_st, mdef = load_dims()
+
+    print("\nLoading actdef (date-filtered, fresh each run)...")
+    actdef = load_actdef()
 
     # ── Incremental: compute API cutoff per fact from existing parquets ──
     inv_path = f"{OUT_DIR}/inventory.parquet"

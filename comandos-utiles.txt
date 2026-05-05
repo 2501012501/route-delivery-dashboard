@@ -1,0 +1,87 @@
+═══════════════════════════════════════════════════════════════════════════
+  COMANDOS UTILES — Route to Delivery Dashboard
+  (copia/pega estas lineas en PowerShell)
+═══════════════════════════════════════════════════════════════════════════
+
+
+─────────────────────────────────────────────────────────────────────────
+1) INICIAR EL DASHBOARD LOCAL
+─────────────────────────────────────────────────────────────────────────
+   cd "C:\Users\Gabriela Sanchez\OneDrive - Falcon Farms, Inc\Route to delivery"
+   python -m streamlit run Home.py
+
+   * Deja la ventana abierta mientras uses el dashboard.
+   * Si la cierras, se cae el local. La publica sigue funcionando.
+   * Alternativa: doble-click en  start-dashboard.bat
+
+
+─────────────────────────────────────────────────────────────────────────
+2) REFRESCAR DATOS A MANO (equivale al boton API + auto-publish)
+─────────────────────────────────────────────────────────────────────────
+   & "C:\Users\Gabriela Sanchez\OneDrive - Falcon Farms, Inc\Route to delivery\scripts\auto-refresh.bat"
+
+   * Tarda ~20 segundos (incremental).
+   * Hace: descarga -> guarda parquets -> git push -> Cloud rebuild.
+   * NO necesitas correrlo si la tarea programada de cada hora esta activa.
+
+
+─────────────────────────────────────────────────────────────────────────
+3) VER EL LOG DE LA ULTIMA CORRIDA (lo que hizo el script por dentro)
+─────────────────────────────────────────────────────────────────────────
+   Get-Content "$env:LOCALAPPDATA\RouteToDelivery\logs\auto-refresh.log" -Tail 30
+
+   * Para ver mas lineas:    -Tail 100
+   * Para ver en vivo:        agrega  -Wait    (Ctrl+C para salir)
+
+
+─────────────────────────────────────────────────────────────────────────
+4) ESTADO DE LA TAREA PROGRAMADA (cada hora 7am-8pm)
+─────────────────────────────────────────────────────────────────────────
+   Get-ScheduledTaskInfo -TaskName RouteToDelivery-AutoRefresh | Format-List LastRunTime, LastTaskResult, NextRunTime
+
+   * LastTaskResult = 0   -> ultima corrida OK
+   * LastTaskResult != 0  -> hubo error, mira el log
+
+
+─────────────────────────────────────────────────────────────────────────
+5) DISPARAR LA TAREA PROGRAMADA AHORA (sin esperar a la hora)
+─────────────────────────────────────────────────────────────────────────
+   Start-ScheduledTask -TaskName RouteToDelivery-AutoRefresh
+
+   * Corre en segundo plano (sin ventana). Confirma con el log de #3.
+
+
+─────────────────────────────────────────────────────────────────────────
+6) REINSTALAR / DESINSTALAR LA TAREA PROGRAMADA (si hace falta)
+─────────────────────────────────────────────────────────────────────────
+   Reinstalar:
+   cd "C:\Users\Gabriela Sanchez\OneDrive - Falcon Farms, Inc\Route to delivery\scripts"
+   .\install-scheduled-task.ps1
+
+   Desinstalar:
+   .\install-scheduled-task.ps1 -Uninstall
+
+
+─────────────────────────────────────────────────────────────────────────
+7) URLs IMPORTANTES
+─────────────────────────────────────────────────────────────────────────
+   Dashboard local:   http://localhost:8501  (o 8502/8503 si abres mas tabs)
+   Dashboard publico: https://route-delivery-dashboard.streamlit.app
+
+
+═══════════════════════════════════════════════════════════════════════════
+  TIPS RAPIDOS
+═══════════════════════════════════════════════════════════════════════════
+
+  - Para ver datos de AYER en vez de hoy: en el sidebar, cambia el campo
+    DATE a la fecha que quieras.
+
+  - El header dice "SYNCED N MIN AGO" = cuando bajamos data de Retex.
+    El expander de Data dice "Latest visit: ..." = la visita mas
+    reciente registrada (puede ser de ayer o de hace varios dias si
+    nadie ha visitado nada nuevo).
+
+  - Si la pagina publica se ve diferente del local, espera 30-60 seg
+    despues de un refresh para que Cloud termine de reconstruir.
+
+═══════════════════════════════════════════════════════════════════════════
