@@ -33,6 +33,37 @@ def _format_freshness(vis=None) -> str | None:
     return f"Synced {_format_ago(epoch)}"
 
 
+def _render_sidebar_toggle():
+    """Custom toggle button (☰ / ✕) pinned top-left to hide/show the sidebar.
+    Replaces Streamlit's built-in collapse/expand which doesn't render its
+    expand arrow correctly on Streamlit 1.57+. Uses session_state so the
+    state persists across reruns within a session.
+    """
+    if 'sidebar_hidden' not in st.session_state:
+        st.session_state.sidebar_hidden = False
+
+    # Wrap the button in a keyed container so we can pin it via CSS.
+    # Streamlit adds a class `st-key-rtd-sidebar-toggle` to the wrapper.
+    with st.container(key="rtd-sidebar-toggle"):
+        label = "☰" if st.session_state.sidebar_hidden else "✕"
+        if st.button(label, key="rtd_sb_toggle_btn",
+                     help="Show / hide the sidebar"):
+            st.session_state.sidebar_hidden = not st.session_state.sidebar_hidden
+            st.rerun()
+
+    if st.session_state.sidebar_hidden:
+        st.markdown(
+            '<style>'
+            'section[data-testid="stSidebar"]{display:none !important;}'
+            '[data-testid="stAppViewContainer"] > section.main,'
+            '[data-testid="stAppViewContainer"] > div.main {'
+            'margin-left:0 !important;max-width:100% !important;'
+            '}'
+            '</style>',
+            unsafe_allow_html=True,
+        )
+
+
 def setup():
     """Returns ((inv, dlv, vis, sm, rm, sent), route_cols, filters).
 
@@ -40,6 +71,7 @@ def setup():
     Renders the persistent top header (brand + freshness pill).
     """
     inject_css()
+    _render_sidebar_toggle()
 
     inv, dlv, vis, sm, rm, rm_error, sent = load_data()
     # Compute freshness from data content (same on local + Cloud) before rendering header
