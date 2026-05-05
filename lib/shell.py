@@ -18,16 +18,19 @@ from lib.theme import inject_css, top_header
 
 
 def _format_freshness(vis=None) -> str | None:
-    """Returns 'Synced N min ago' from the sync marker (preferred) or
-    'Updated N min ago' from the newest visit (fallback when marker absent).
-    Same value on local and Cloud — the marker file ships through git."""
-    epoch = _last_synced_epoch()
-    if epoch is not None:
-        return f"Synced {_format_ago(epoch)}"
+    """Header pill shows the LATEST VISIT in the data ('Last visit N min ago').
+    That's the operationally relevant signal — it answers "how current are
+    the realized visits?". The sync time is still shown inside the Data
+    expander (refresh.py) for users who want to see when we last pulled.
+    """
     epoch = _data_freshness_epoch(vis=vis)
+    if epoch is not None:
+        return f"Last visit {_format_ago(epoch)}"
+    # Fallback: if no visit data yet, show sync time so the pill isn't blank.
+    epoch = _last_synced_epoch()
     if epoch is None:
         return None
-    return f"Updated {_format_ago(epoch)}"
+    return f"Synced {_format_ago(epoch)}"
 
 
 def setup():
