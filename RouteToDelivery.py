@@ -45,6 +45,11 @@ CACHE_TTL_H   = 24
 DIM_WORKERS   = 4   # parallel HTTP for dimensions
 FACT_WORKERS  = 3   # parallel HTTP for inv/dlv/vis
 
+# Incremental refresh: how many days of overlap to refetch each run, to
+# catch late-arriving rows or in-place updates from Retex. The stable
+# portion of the existing parquet (date < cutoff) is kept untouched.
+INCREMENTAL_OVERLAP_DAYS = 1
+
 STORE_MASTER_COLS = [
     'STORE NUMBER WF', 'CUSTOMER', 'CLUSTER FULL', 'CLUSTER XXX',
     'Route', 'Route_ID_WF', 'Route_ID_AFS',
@@ -123,6 +128,97 @@ def build_store_master():
     return sm
 
 
+# ── Incremental refresh helpers ───────────────────────────────────────────────
+def _now_utc_naive():
+    """Tz-naive UTC 'now' — for comparisons against parsed datetime columns."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _incremental_cutoff(parquet_path: str, date_col: str, fallback_days: int,
+                         *, is_int_date: bool = False):
+    """Return the API cutoff datetime to use for fetching this fact.
+
+    If the parquet exists and has data: max(date) - INCREMENTAL_OVERLAP_DAYS.
+    Otherwise (or if the existing data is older than the rolling window):
+    `now - fallback_days` so we do a full pull.
+
+    Always tz-naive UTC. Clamped to `now - fallback_days` to bound API load
+    in case the existing parquet has a corrupted/very-old max date.
+    """
+    floor = _now_utc_naive() - timedelta(days=fallback_days)
+    p = Path(parquet_path)
+    if not p.exists():
+        return floor
+    try:
+        df = pd.read_parquet(p, columns=[date_col])
+    except Exception:
+        return floor
+    if df.empty:
+        return floor
+
+    if is_int_date:
+        try:
+            max_int = int(df[date_col].max())
+            max_dt = datetime.strptime(str(max_int), '%Y%m%d')
+        except Exception:
+            return floor
+    else:
+        ts = pd.to_datetime(df[date_col], errors='coerce', utc=True).max()
+        if pd.isna(ts):
+            return floor
+        max_dt = ts.tz_convert('UTC').tz_localize(None).to_pydatetime()
+
+    incremental = max_dt - timedelta(days=INCREMENTAL_OVERLAP_DAYS)
+    # Never go further back than the rolling window — bounds API load and
+    # guarantees we re-pull at least the last `fallback_days` days if the
+    # existing parquet has aged out.
+    return max(incremental, floor)
+
+
+def _slide_window(parquet_path: str, new_df: pd.DataFrame, *,
+                   date_col: str, api_cutoff, days_window: int,
+                   is_int_date: bool = False) -> pd.DataFrame:
+    """Combine fresh API rows with the stable portion of the existing parquet.
+
+    stable = rows in existing parquet with date < api_cutoff (won't be re-fetched)
+    new_df = freshly fetched rows (date >= api_cutoff per API filter)
+    Final  = stable + new_df, restricted to last `days_window` days.
+
+    No dedupe needed: the two partitions are disjoint by date.
+    """
+    rolling_cutoff = _now_utc_naive() - timedelta(days=days_window)
+
+    p = Path(parquet_path)
+    existing = pd.read_parquet(p) if p.exists() else pd.DataFrame()
+
+    if existing.empty:
+        merged = new_df.copy()
+    elif new_df.empty:
+        merged = existing.copy()
+    else:
+        if is_int_date:
+            cutoff_int = int(api_cutoff.strftime('%Y%m%d'))
+            stable = existing[existing[date_col].astype(int) < cutoff_int]
+        else:
+            ex_dates = pd.to_datetime(existing[date_col], errors='coerce',
+                                      utc=True).dt.tz_localize(None)
+            stable = existing[ex_dates < pd.Timestamp(api_cutoff)]
+        merged = pd.concat([stable, new_df], ignore_index=True, sort=False)
+
+    if merged.empty:
+        return merged
+
+    if is_int_date:
+        rolling_int = int(rolling_cutoff.strftime('%Y%m%d'))
+        merged = merged[merged[date_col].astype(int) >= rolling_int]
+    else:
+        m_dates = pd.to_datetime(merged[date_col], errors='coerce',
+                                 utc=True).dt.tz_localize(None)
+        merged = merged[m_dates >= pd.Timestamp(rolling_cutoff)]
+
+    return merged.reset_index(drop=True)
+
+
 # ── Dimensiones (parallel + cached) ───────────────────────────────────────────
 _DIM_SPECS = [
     ('cust',    f"{BASE}/BaseDimensions/DCustomer",
@@ -170,8 +266,10 @@ def _retailer_mask(series):
 
 
 # ── Inventario (FMonitoringAnswer) ────────────────────────────────────────────
-def load_inventory(cust, prod, user, mdef):
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=DAYS)).strftime("%Y-%m-%dT00:00:00Z")
+def load_inventory(cust, prod, user, mdef, *, since=None):
+    if since is None:
+        since = _now_utc_naive() - timedelta(days=DAYS)
+    cutoff = since.strftime("%Y-%m-%dT00:00:00Z")
     print(f"  [INVENTORY] Filter: Answer_Date ge {cutoff}")
     url = f"{BASE}/MonitoringDomain/FMonitoringAnswer?$filter=Answer_Date ge {cutoff}"
     df = fetch_all(url, sess=_new_session(), label="inv")
@@ -195,8 +293,10 @@ def load_inventory(cust, prod, user, mdef):
 
 
 # ── Delivery (FOrderSale) ─────────────────────────────────────────────────────
-def load_delivery(cust, prod, user):
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=DAYS)).strftime("%Y-%m-%dT00:00:00Z")
+def load_delivery(cust, prod, user, *, since=None):
+    if since is None:
+        since = _now_utc_naive() - timedelta(days=DAYS)
+    cutoff = since.strftime("%Y-%m-%dT00:00:00Z")
     flt = f"(Document_Type_ID eq 'CREDITS' or Document_Type_ID eq 'DEL') and Created_Date ge {cutoff}"
     print(f"  [DELIVERY] Filter: {flt}")
     url = f"{BASE}/OrderSalesDomain/FOrderSale?$filter={flt}"
@@ -219,8 +319,10 @@ def load_delivery(cust, prod, user):
 
 
 # ── Visitas (FActivitySt + DActivityDefinition) ───────────────────────────────
-def load_visits(cust, cust_st, user, user_st, actdef):
-    cutoff_int = int((datetime.now(timezone.utc) - timedelta(days=DAYS)).strftime("%Y%m%d"))
+def load_visits(cust, cust_st, user, user_st, actdef, *, since=None):
+    if since is None:
+        since = _now_utc_naive() - timedelta(days=DAYS)
+    cutoff_int = int(since.strftime("%Y%m%d"))
     flt = f"Date_Int ge {cutoff_int}"
     print(f"  [VISITS] Filter: {flt}")
     url = f"{BASE}/ActivityDomain/FActivitySt?$filter={flt}"
@@ -277,31 +379,64 @@ def main():
     print("\nLoading dimensions from Retex API (parallel + cached)...")
     cust, cust_st, prod, user, user_st, mdef, actdef = load_dims()
 
-    print("\nLoading INVENTORY / DELIVERY / VISITS in parallel...")
-    with ThreadPoolExecutor(max_workers=FACT_WORKERS) as pool:
-        f_inv   = pool.submit(load_inventory, cust, prod, user, mdef)
-        f_deliv = pool.submit(load_delivery,  cust, prod, user)
-        f_vis   = pool.submit(load_visits,    cust, cust_st, user, user_st, actdef)
-        inv   = f_inv.result()
-        deliv = f_deliv.result()
-        vis   = f_vis.result()
+    # ── Incremental: compute API cutoff per fact from existing parquets ──
+    inv_path = f"{OUT_DIR}/inventory.parquet"
+    dlv_path = f"{OUT_DIR}/delivery.parquet"
+    vis_path = f"{OUT_DIR}/visits.parquet"
 
-    if not inv.empty:
-        inv = inv.merge(store_master, on='Store_Number', how='left')
-    print(f"  Inventory rows: {len(inv):,}")
-    inv.to_parquet(f"{OUT_DIR}/inventory.parquet", index=False)
+    inv_since = _incremental_cutoff(inv_path, 'Answer_Date',  DAYS)
+    dlv_since = _incremental_cutoff(dlv_path, 'Created_Date', DAYS)
+    vis_since = _incremental_cutoff(vis_path, 'Date_Int',     DAYS, is_int_date=True)
+
+    full_floor = (_now_utc_naive() - timedelta(days=DAYS)).date()
+    inv_mode = "full" if inv_since.date() <= full_floor else "incremental"
+    dlv_mode = "full" if dlv_since.date() <= full_floor else "incremental"
+    vis_mode = "full" if vis_since.date() <= full_floor else "incremental"
+    print(
+        f"\nLoading INVENTORY ({inv_mode} since {inv_since.date()}) / "
+        f"DELIVERY ({dlv_mode} since {dlv_since.date()}) / "
+        f"VISITS ({vis_mode} since {vis_since.date()}) in parallel..."
+    )
+
+    with ThreadPoolExecutor(max_workers=FACT_WORKERS) as pool:
+        f_inv   = pool.submit(load_inventory, cust, prod, user, mdef, since=inv_since)
+        f_deliv = pool.submit(load_delivery,  cust, prod, user,       since=dlv_since)
+        f_vis   = pool.submit(load_visits,    cust, cust_st, user, user_st, actdef,
+                              since=vis_since)
+        new_inv   = f_inv.result()
+        new_deliv = f_deliv.result()
+        new_vis   = f_vis.result()
+
+    # Merge new rows with store_master (matches old behavior — store_master
+    # columns end up in the parquet and stay through the slide_window concat).
+    if not new_inv.empty:
+        new_inv = new_inv.merge(store_master, on='Store_Number', how='left')
+    if not new_deliv.empty:
+        new_deliv = new_deliv.merge(store_master, on='Store_Number', how='left')
+    if not new_vis.empty:
+        new_vis = new_vis.merge(store_master, on='Store_Number', how='left')
+
+    # Combine fresh rows with the stable portion of each existing parquet.
+    inv = _slide_window(inv_path, new_inv,
+                        date_col='Answer_Date',  api_cutoff=inv_since,
+                        days_window=DAYS)
+    deliv = _slide_window(dlv_path, new_deliv,
+                          date_col='Created_Date', api_cutoff=dlv_since,
+                          days_window=DAYS)
+    vis = _slide_window(vis_path, new_vis,
+                        date_col='Date_Int',     api_cutoff=vis_since,
+                        days_window=DAYS, is_int_date=True)
+
+    print(f"  Inventory: {len(inv):,} total rows  (fetched {len(new_inv):,} new/updated)")
+    inv.to_parquet(inv_path, index=False)
     inv.to_csv(f"{OUT_DIR}/inventory.csv", index=False)
 
-    if not deliv.empty:
-        deliv = deliv.merge(store_master, on='Store_Number', how='left')
-    print(f"  Delivery rows: {len(deliv):,}")
-    deliv.to_parquet(f"{OUT_DIR}/delivery.parquet", index=False)
+    print(f"  Delivery:  {len(deliv):,} total rows  (fetched {len(new_deliv):,} new/updated)")
+    deliv.to_parquet(dlv_path, index=False)
     deliv.to_csv(f"{OUT_DIR}/delivery.csv", index=False)
 
-    if not vis.empty:
-        vis = vis.merge(store_master, on='Store_Number', how='left')
-    print(f"  Visits rows: {len(vis):,}")
-    vis.to_parquet(f"{OUT_DIR}/visits.parquet", index=False)
+    print(f"  Visits:    {len(vis):,} total rows  (fetched {len(new_vis):,} new/updated)")
+    vis.to_parquet(vis_path, index=False)
     vis.to_csv(f"{OUT_DIR}/visits.csv", index=False)
 
     # Write a sync marker so the dashboard can show "Synced: <time>"
