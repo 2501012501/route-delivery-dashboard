@@ -141,15 +141,30 @@ _CSS = f"""
   /* ── Sidebar polish ───────────────────────────────────────────────── */
   /* Locked-open: width fixed, can't be collapsed (collapse buttons hidden
      above). Soft blue tint differentiates the navigation column from the
-     content area. */
-  section[data-testid="stSidebar"] {{
+     content area. The override has to win against Streamlit's inline
+     transform/width that triggers when collapsed state is stored in
+     localStorage from a previous session. */
+  section[data-testid="stSidebar"],
+  section[data-testid="stSidebar"][aria-expanded="false"],
+  section[data-testid="stSidebar"][aria-expanded="true"],
+  div[data-testid="stSidebar"],
+  [data-testid="stSidebar"] {{
     background: {PALE_BLUE} !important;
     border-right: 1px solid {BORDER};
     box-shadow: {SHADOW_SM};
     min-width: 244px !important;
     max-width: 244px !important;
-    transform: none !important;
+    width: 244px !important;
+    transform: translateX(0) !important;
     visibility: visible !important;
+    display: block !important;
+    margin-left: 0 !important;
+    left: 0 !important;
+  }}
+  /* Hide the drag-to-resize handle since width is fixed */
+  [data-testid="stSidebarResizer"],
+  [data-testid="stSidebarResizeHandle"] {{
+    display: none !important;
   }}
 
   /* ── Sidebar nav (page menu at the top) ───────────────────────────── */

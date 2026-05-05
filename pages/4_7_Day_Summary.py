@@ -13,7 +13,8 @@ from lib.shell import setup
 from lib.theme import (SLATE, kpi, kpi_grid, page_header,
                         panel_close, panel_open)
 
-st.set_page_config(page_title="7-Day Summary", layout="wide", page_icon="📊")
+st.set_page_config(page_title="7-Day Summary", layout="wide", page_icon="📊",
+                    initial_sidebar_state="expanded")
 (inv, dlv, vis, sm, rm, sent), route_cols, f = setup()
 
 target_date = f['target_date']

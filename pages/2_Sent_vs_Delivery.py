@@ -34,7 +34,8 @@ def _status_filter(key: str) -> str:
         horizontal=True, key=key, label_visibility="collapsed",
     )
 
-st.set_page_config(page_title="Sent vs Delivery", layout="wide", page_icon="📦")
+st.set_page_config(page_title="Sent vs Delivery", layout="wide", page_icon="📦",
+                    initial_sidebar_state="expanded")
 (inv, dlv, vis, sm, rm, sent), route_cols, f = setup()
 
 page_header(

@@ -42,7 +42,8 @@ def _status_filter(key: str) -> str:
     )
     return '(All)' if choice == '(All)' else choice.split(' ', 1)[1]
 
-st.set_page_config(page_title="Daily Follow", layout="wide", page_icon="📅")
+st.set_page_config(page_title="Daily Follow", layout="wide", page_icon="📅",
+                    initial_sidebar_state="expanded")
 (inv, dlv, vis, sm, rm, sent), route_cols, f = setup()
 
 # Day-filtered fact frames first (needed to compute "active" routes).
