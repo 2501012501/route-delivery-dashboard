@@ -257,13 +257,13 @@ def render_refresh_section(last_visit, *, vis=None):
     if pending and pending['kind'] == 'error':
         st.error(f"⚠️ Auto-publish failed:\n{pending['msg']}")
 
-    # The collapsed label shows the SYNC time (when we last pulled fresh data),
-    # because that's what tells the user the system is working. Latest visit
-    # time is a different (and often older) concept — shown inside the expander.
-    epoch_label = epoch_sync if epoch_sync is not None else epoch_data
-    if epoch_label is not None:
-        verb = "Synced" if epoch_sync is not None else "Updated"
-        label = f"📡 Data · {verb} {_format_ago(epoch_label)}"
+    # The collapsed label leads with "Last visit" — that's the operational
+    # signal the user watches throughout the day. The sync time is still
+    # visible inside the expander for confirming the pipeline is healthy.
+    if epoch_data is not None:
+        label = f"📡 Data · Last visit {_format_ago(epoch_data)}"
+    elif epoch_sync is not None:
+        label = f"📡 Data · Synced {_format_ago(epoch_sync)}"
     else:
         label = "📡 Data"
     if pending and pending['kind'] == 'error':
@@ -273,20 +273,19 @@ def render_refresh_section(last_visit, *, vis=None):
         # Show any non-error publish status (success / info) that survived the rerun
         render_publish_status()
 
-        # Two distinct timestamps the user cares about:
-        #   1) Synced — when RouteToDelivery.py last ran (proves the pipeline works)
-        #   2) Latest visit — newest visit recorded in the data (depends on Retex)
-        if epoch_sync is not None:
-            ts = (pd.Timestamp(epoch_sync, unit='s', tz='UTC')
-                    .tz_convert(BUSINESS_TZ)
-                    .tz_localize(None))
-            st.caption(f"☁️ **Synced:** {ts.strftime('%Y-%m-%d %H:%M')} · _{_format_ago(epoch_sync)}_")
-
+        # Latest visit is shown first — it's the operationally meaningful signal.
+        # Sync time is shown second as a "is the pipeline healthy?" indicator.
         if epoch_data is not None:
             ts = (pd.Timestamp(epoch_data, unit='s', tz='UTC')
                     .tz_convert(BUSINESS_TZ)
                     .tz_localize(None))
             st.caption(f"📍 **Latest visit:** {ts.strftime('%Y-%m-%d %H:%M')} · _{_format_ago(epoch_data)}_")
+
+        if epoch_sync is not None:
+            ts = (pd.Timestamp(epoch_sync, unit='s', tz='UTC')
+                    .tz_convert(BUSINESS_TZ)
+                    .tz_localize(None))
+            st.caption(f"☁️ **Synced:** {ts.strftime('%Y-%m-%d %H:%M')} · _{_format_ago(epoch_sync)}_")
 
         if is_cloud():
             st.caption("🌐 **Read-only view** — refresh disabled in cloud. "
