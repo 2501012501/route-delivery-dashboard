@@ -13,6 +13,7 @@ BLUE       = "#2251FF"   # accent
 BLUE_DARK  = "#1A3FCC"   # accent-hover
 PALE_BLUE  = "#EDF2FE"   # pill backgrounds, hover tints
 SOFT_BLUE  = "#F7F9FF"   # very subtle accent area
+SIDEBAR_BG = "#DCE6FA"   # sidebar background — distinctly blue, still readable
 SLATE      = "#64748B"   # secondary text, eyebrow labels
 SLATE_LIGHT = "#94A3B8"  # tertiary text
 PAGE_BG    = "#F6F7F9"   # body background (slightly more contrast than before)
@@ -149,7 +150,7 @@ _CSS = f"""
   section[data-testid="stSidebar"][aria-expanded="true"],
   div[data-testid="stSidebar"],
   [data-testid="stSidebar"] {{
-    background: {PALE_BLUE} !important;
+    background: {SIDEBAR_BG} !important;
     border-right: 1px solid {BORDER};
     box-shadow: {SHADOW_SM};
     min-width: 244px !important;
@@ -397,12 +398,12 @@ _CSS = f"""
   /* ── Sidebar refresh buttons (API / Masters / Sent) ───────────────── */
   section[data-testid="stSidebar"] [data-testid="stButton"] button {{
     text-transform: uppercase;
-    letter-spacing: 0.3px;
-    font-size: 10px;
+    letter-spacing: 0.2px;
+    font-size: 9px;
     font-weight: 700;
-    padding: 8px 4px;
+    padding: 5px 2px;
     min-height: 0;
-    border-radius: 8px;
+    border-radius: 6px;
     border: 1px solid {BORDER};
     background: {SURFACE};
     color: {NAVY};
@@ -414,9 +415,9 @@ _CSS = f"""
     border-color: {BLUE};
     color: {BLUE};
   }}
-  /* Tighten the gap between the 3 buttons so they have a bit more room */
+  /* Tighten the gap between the 3 buttons so they have more room */
   section[data-testid="stSidebar"] [data-testid="stHorizontalBlock"] {{
-    gap: 6px !important;
+    gap: 4px !important;
   }}
 </style>
 """
