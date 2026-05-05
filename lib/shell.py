@@ -18,14 +18,14 @@ from lib.theme import inject_css, top_header
 
 
 def _format_freshness(vis=None) -> str | None:
-    """Header pill shows the LATEST VISIT in the data ('Last visit N min ago').
-    That's the operationally relevant signal — it answers "how current are
-    the realized visits?". The sync time is still shown inside the Data
-    expander (refresh.py) for users who want to see when we last pulled.
+    """Header pill shows 'Last activity N min ago' from Sys_LastChange (Retex's
+    row-level last-modified). That advances within minutes of real-time as
+    drivers complete and update visits. Sync time is shown inside the Data
+    expander as a secondary 'is the pipeline alive' indicator.
     """
     epoch = _data_freshness_epoch(vis=vis)
     if epoch is not None:
-        return f"Last visit {_format_ago(epoch)}"
+        return f"Last activity {_format_ago(epoch)}"
     # Fallback: if no visit data yet, show sync time so the pill isn't blank.
     epoch = _last_synced_epoch()
     if epoch is None:

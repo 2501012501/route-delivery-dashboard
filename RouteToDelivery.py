@@ -385,6 +385,11 @@ def load_visits(cust, cust_st, user, user_st, actdef, *, since=None):
         'Monitoring_Count', 'Payment_Count',
         'Total_Ordered', 'Total_Delivered', 'Total_Returned',
         'Store_Rating',
+        # Sys_LastChange = the moment Retex's DB last touched this row.
+        # Used by the dashboard's freshness pill — much more current than
+        # First/Last_Realization, which only capture when the visit
+        # *started/ended* (and lag the rest of the row).
+        'Sys_LastChange',
     ]
     return df[[c for c in keep if c in df.columns]]
 

@@ -61,16 +61,28 @@ def _last_synced_epoch() -> float | None:
 
 def _data_freshness_epoch(*, vis=None) -> float | None:
     """Newest record timestamp inside the loaded data, as epoch seconds.
-    This is the same value on local and Cloud since both read the same
-    parquets — so the freshness indicator agrees in both views.
+
+    Prefers `Sys_LastChange` — Retex's row-level last-modified timestamp,
+    which advances as the day's activity flows in (within minutes of real
+    time). Falls back to `Visit_DateTime` (= First_Realization) for
+    parquets written before Sys_LastChange was added to the keep list,
+    or to file mtime as last resort.
     """
-    if vis is None or vis.empty or 'Visit_DateTime' not in vis.columns:
+    if vis is None or vis.empty:
         return _file_mtime_epoch()
-    m = vis['Visit_DateTime'].max()
-    if pd.isna(m):
-        return _file_mtime_epoch()
-    # Visit_DateTime is naive UTC (parsed with utc=True then tz_localize(None))
-    return m.tz_localize('UTC').timestamp()
+
+    if 'Sys_LastChange' in vis.columns:
+        m = vis['Sys_LastChange'].max()
+        if pd.notna(m):
+            # Naive UTC (parsed with utc=True then tz_localize(None))
+            return m.tz_localize('UTC').timestamp()
+
+    if 'Visit_DateTime' in vis.columns:
+        m = vis['Visit_DateTime'].max()
+        if pd.notna(m):
+            return m.tz_localize('UTC').timestamp()
+
+    return _file_mtime_epoch()
 
 
 # Back-compat aliases
@@ -257,11 +269,11 @@ def render_refresh_section(last_visit, *, vis=None):
     if pending and pending['kind'] == 'error':
         st.error(f"⚠️ Auto-publish failed:\n{pending['msg']}")
 
-    # The collapsed label leads with "Last visit" — that's the operational
-    # signal the user watches throughout the day. The sync time is still
-    # visible inside the expander for confirming the pipeline is healthy.
+    # The collapsed label leads with "Last activity" (Sys_LastChange) — that's
+    # the freshness signal the user watches throughout the day. Sync time is
+    # shown second as a "is our pipeline alive" indicator.
     if epoch_data is not None:
-        label = f"📡 Data · Last visit {_format_ago(epoch_data)}"
+        label = f"📡 Data · Last activity {_format_ago(epoch_data)}"
     elif epoch_sync is not None:
         label = f"📡 Data · Synced {_format_ago(epoch_sync)}"
     else:
@@ -273,13 +285,13 @@ def render_refresh_section(last_visit, *, vis=None):
         # Show any non-error publish status (success / info) that survived the rerun
         render_publish_status()
 
-        # Latest visit is shown first — it's the operationally meaningful signal.
-        # Sync time is shown second as a "is the pipeline healthy?" indicator.
+        # Last activity (Sys_LastChange) shown first — it's what the user
+        # watches. Sync time second as the "pipeline healthy?" check.
         if epoch_data is not None:
             ts = (pd.Timestamp(epoch_data, unit='s', tz='UTC')
                     .tz_convert(BUSINESS_TZ)
                     .tz_localize(None))
-            st.caption(f"📍 **Latest visit:** {ts.strftime('%Y-%m-%d %H:%M')} · _{_format_ago(epoch_data)}_")
+            st.caption(f"📍 **Last activity:** {ts.strftime('%Y-%m-%d %H:%M')} · _{_format_ago(epoch_data)}_")
 
         if epoch_sync is not None:
             ts = (pd.Timestamp(epoch_sync, unit='s', tz='UTC')

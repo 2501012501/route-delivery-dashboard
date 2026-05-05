@@ -77,6 +77,8 @@ def _load_data_cached(signature: tuple):
     inv['Answer_Date']          = pd.to_datetime(inv['Answer_Date']).dt.date
     dlv['Created_Date']         = pd.to_datetime(dlv['Created_Date']).dt.date
     vis['Appointment_DateTime'] = pd.to_datetime(vis['Appointment_DateTime'], errors='coerce', utc=True).dt.tz_localize(None)
+    if 'Sys_LastChange' in vis.columns:
+        vis['Sys_LastChange'] = pd.to_datetime(vis['Sys_LastChange'], errors='coerce', utc=True).dt.tz_localize(None)
 
     if 'First_Realization_DateTime' in vis.columns:
         vis['First_Realization_DateTime'] = pd.to_datetime(vis['First_Realization_DateTime'], errors='coerce')
