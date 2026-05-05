@@ -36,9 +36,23 @@ _CSS = f"""
     background: {PAGE_BG};
   }}
 
-  /* Hide Streamlit's default top header for a cleaner webapp feel */
+  /* Slim down Streamlit's default top header for a cleaner webapp feel,
+     but keep it functional so the sidebar collapse/expand arrow remains
+     reachable when the sidebar is hidden. */
   header[data-testid="stHeader"] {{
+    background: transparent;
+    height: 0;
+  }}
+  /* Hide the toolbar (Stop button, kebab menu) but NOT the sidebar toggle */
+  header[data-testid="stHeader"] [data-testid="stToolbar"] {{
     display: none;
+  }}
+  /* Make sure the sidebar expand arrow (when collapsed) is visible & clickable */
+  [data-testid="stSidebarCollapsedControl"],
+  [data-testid="collapsedControl"] {{
+    display: flex !important;
+    visibility: visible !important;
+    z-index: 1000;
   }}
 
   /* Constrain content width so it reads like a real webapp */
